@@ -9,6 +9,22 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="icon" type="image/png" href="./icon-192.png" />
+    <script>
+      // Se um arquivo do app não carregar (cache antigo após nova publicação), recarrega UMA vez sem cache.
+      window.addEventListener('error', function (e) {
+        var t = e.target;
+        if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+          try {
+            if (sessionStorage.getItem('okxbot.reloaded')) return;
+            sessionStorage.setItem('okxbot.reloaded', '1');
+          } catch (_) {}
+          location.replace(location.pathname + '?v=' + Date.now() + location.hash);
+        }
+      }, true);
+      window.addEventListener('load', function () {
+        setTimeout(function () { try { sessionStorage.removeItem('okxbot.reloaded'); } catch (_) {} }, 5000);
+      });
+    </script>
     <title>OKX Trading Bot Dashboard</title>
   </head>
   <body class="bg-zinc-950">
