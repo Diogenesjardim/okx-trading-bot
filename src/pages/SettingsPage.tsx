@@ -18,6 +18,7 @@ const WORKING = [
   'Validação (Fase 3): treino × teste, otimização só no treino, janelas sucessivas, comparação com comprar e segurar e 300 simulações aleatórias, veredito objetivo e histórico de validações.',
   'Matriz BTC/ETH × 5m/15m/1h/4h com os mesmos parâmetros e histórico das últimas 5 execuções para comparar.',
   'Filtro de tendência (SMA50/100/200) no Analista, Backtest, Validação e Matriz.',
+  'Diário de operações reais (registro manual, separado do fictício) com comparação real × simulador e CSV.',
   'Métricas: resultado bruto e líquido, maior sequência de perdas, média por operação.',
   'Configurações e históricos salvos no LocalStorage.',
 ];
@@ -28,7 +29,7 @@ const PENDING = [
   'Sincronização entre dispositivos (dados ficam apenas neste navegador).',
   'Gráfico de velas (candlestick); hoje o preço é exibido em linha.',
   'Estratégias além do cruzamento SMA9/SMA21 + filtro RSI.',
-  'Ordens reais — fora do escopo por segurança, não serão adicionadas nesta fase.',
+  'Envio automático de ordens (próximo passo: conta Demo da OKX via Supabase; dinheiro real só depois).',
 ];
 
 export function SettingsPage() {

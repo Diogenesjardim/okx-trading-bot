@@ -5,7 +5,8 @@ import { useBots } from '../hooks/BotsContext';
 import { computeStats } from '../lib/metrics';
 import { dailyUsage, limitReason, simPhase, unrealized } from '../lib/simEngine';
 import { fmtDateTime, fmtPrice, fmtSignedUSD, fmtTime, fmtUSD, pnlColor } from '../lib/format';
-import { Card, ChipMulti, ConfirmButton, ErrorBox, Notice, NumberField, SideBadge } from '../components/ui';
+import { Card, ChipMulti, ConfirmButton, ErrorBox, Notice, NumberField, Segmented, SideBadge } from '../components/ui';
+import { Journal } from './Journal';
 import { StrategyFields, validateStrategy } from '../components/StrategyFields';
 import { CsvButtons, ReportCharts, StatsGrid } from '../components/Report';
 import { TradesTable } from '../components/TradesTable';
@@ -23,6 +24,16 @@ const FLOW = [
 ];
 
 export function SimulatorPage() {
+  const [tab, setTab] = useState<'sim' | 'real'>('sim');
+  return (
+    <>
+      <Segmented options={[{ id: 'sim', label: 'Simulado (fictício)' }, { id: 'real', label: 'Diário real' }]} value={tab} onChange={setTab} />
+      {tab === 'sim' ? <SimulatedView /> : <Journal />}
+    </>
+  );
+}
+
+function SimulatedView() {
   const { sim, analyst, actionError, simStart, simPause, simEnd, simClosePosition, simUpdateConfig, simReset } = useBots();
   const [draft, setDraft] = useState<SimConfig>(sim.config);
   const [msg, setMsg] = useState<string | null>(null);
