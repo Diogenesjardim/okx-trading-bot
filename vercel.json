@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/okx-api/:path*", "destination": "https://www.okx.com/:path*" }
+  ]
+}
