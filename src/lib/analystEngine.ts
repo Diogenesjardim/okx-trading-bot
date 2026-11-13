@@ -11,6 +11,8 @@ export interface AnalystConfig {
   instruments: InstId[];
   timeframes: Timeframe[];
   rsiFilter: boolean;
+  trendFilter: boolean;
+  trendPeriod: number;
   intervalSec: 15 | 30 | 60;
   sound: boolean;
   notifications: boolean;
@@ -23,6 +25,8 @@ export interface StreamSnapshot {
   signal: Signal;
   cross: Cross;
   blockedByRsi: boolean;
+  blockedByTrend?: boolean;
+  smaTrend?: number | null;
   candleTs: number | null; // abertura do último candle FECHADO
   closeTime: number | null; // fechamento desse candle
   close: number | null;
@@ -57,6 +61,7 @@ export interface SignalRecord {
   suggestedStop: number;
   suggestedTake: number;
   blockedByRsi: boolean;
+  blockedByTrend?: boolean;
   detectedAt: number;
   decisions: SignalDecision[];
 }
@@ -86,6 +91,8 @@ export const DEFAULT_ANALYST_CONFIG: AnalystConfig = {
   instruments: ['BTC-USDT', 'ETH-USDT'],
   timeframes: ['5m', '15m', '1H', '4H'],
   rsiFilter: true,
+  trendFilter: false,
+  trendPeriod: 200,
   intervalSec: 30,
   sound: false,
   notifications: false,
@@ -126,6 +133,8 @@ export function analyzeStream(args: {
   candles: Candle[];
   lastProcessedTs: number | undefined;
   rsiFilter: boolean;
+  trendFilter?: boolean;
+  trendPeriod?: number;
   risk: RiskParams;
   now: number;
 }): { snapshot: StreamSnapshot; lastProcessedTs: number | undefined; record: SignalRecord | null } {
@@ -139,17 +148,23 @@ export function analyzeStream(args: {
   };
   if (closed.length < 22) return { snapshot: base, lastProcessedTs: args.lastProcessedTs, record: null };
 
-  const ind = computeIndicators(closed);
+  const ind = computeIndicators(closed, args.trendPeriod);
   const i = closed.length - 1;
   const last = closed[i];
-  const s = signalAt(ind, i, args.rsiFilter);
+  const s = signalAt(ind, i, { rsiFilter: args.rsiFilter, trendFilter: args.trendFilter });
+  const smaT = ind.smaTrend[i];
   const sma9 = ind.sma9[i]!;
   const sma21 = ind.sma21[i]!;
   const rsi = ind.rsi14[i];
   const closeTime = last.ts + tfMs(tf);
 
   let reason: string;
-  if (s.cross && s.blockedByRsi) {
+  if (s.cross && s.blockedByTrend) {
+    const dir = s.cross === 'UP' ? 'acima' : 'abaixo';
+    reason = smaT == null
+      ? `SMA9 cruzou ${dir} da SMA21 às ${hhmm(closeTime)}, mas não há candles suficientes para a SMA${ind.trendPeriod}: bloqueado pelo filtro de tendência.`
+      : `SMA9 cruzou ${dir} da SMA21 às ${hhmm(closeTime)}, mas o preço (${p2(last.close)}) está ${last.close > smaT ? 'acima' : 'abaixo'} da SMA${ind.trendPeriod} (${p2(smaT)}): contra a tendência, bloqueado.`;
+  } else if (s.cross && s.blockedByRsi) {
     reason = s.cross === 'UP'
       ? `SMA9 cruzou acima da SMA21 às ${hhmm(closeTime)}, mas RSI ${p2(rsi)} ≥ 70 (sobrecomprado): bloqueado pelo filtro RSI.`
       : `SMA9 cruzou abaixo da SMA21 às ${hhmm(closeTime)}, mas RSI ${p2(rsi)} ≤ 30 (sobrevendido): bloqueado pelo filtro RSI.`;
@@ -165,7 +180,7 @@ export function analyzeStream(args: {
   const levels = side ? suggestLevels(side, last.close, args.risk) : null;
 
   const snapshot: StreamSnapshot = {
-    ...base, signal: s.signal, cross: s.cross, blockedByRsi: s.blockedByRsi, candleTs: last.ts, closeTime,
+    ...base, signal: s.signal, cross: s.cross, blockedByRsi: s.blockedByRsi, blockedByTrend: s.blockedByTrend, smaTrend: smaT, candleTs: last.ts, closeTime,
     close: last.close, sma9, sma21, rsi, reason,
     suggestedStop: s.signal !== 'AGUARDAR' ? levels!.stop : null,
     suggestedTake: s.signal !== 'AGUARDAR' ? levels!.take : null,
@@ -178,7 +193,7 @@ export function analyzeStream(args: {
     ? {
         id: signalId(instId, tf, last.ts, side), key, instId, tf, side, candleTs: last.ts, closeTime,
         price: last.close, sma9, sma21, rsi, reason, suggestedStop: levels!.stop, suggestedTake: levels!.take,
-        blockedByRsi: s.blockedByRsi, detectedAt: now, decisions: [],
+        blockedByRsi: s.blockedByRsi, blockedByTrend: s.blockedByTrend, detectedAt: now, decisions: [],
       }
     : null;
   return { snapshot, lastProcessedTs: last.ts, record };
@@ -200,3 +215,8 @@ export const describeSignal = (r: SignalRecord) => `${r.side} ${instLabel(r.inst
 export function addAnalystLog(a: AnalystState, entry: Omit<AnalystLog, 'ts'>, now: number): AnalystState {
   return { ...a, log: [{ ...entry, ts: now }, ...a.log].slice(0, 100) };
 }
+
+/** Sinal bloqueado por algum filtro (RSI ou tendência). */
+export const isBlocked = (r: Pick<SignalRecord, 'blockedByRsi' | 'blockedByTrend'>) => r.blockedByRsi || !!r.blockedByTrend;
+export const blockLabel = (r: Pick<SignalRecord, 'blockedByRsi' | 'blockedByTrend'>) =>
+  r.blockedByTrend ? 'tendência' : r.blockedByRsi ? 'RSI' : '';

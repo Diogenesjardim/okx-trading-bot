@@ -93,11 +93,14 @@ export interface StrategyConfig {
   feePct: number; // % por lado sobre o valor nocional
   slippagePct: number; // % por execução
   rsiFilter: boolean;
+  /** Filtro de tendência: LONG só com preço acima da SMA longa; SHORT só abaixo. */
+  trendFilter?: boolean;
+  trendPeriod?: number; // padrão 200
   exitOnOppositeCross: boolean;
 }
 
 /** Configuração do Robô Simulador (o filtro RSI pertence ao Robô Analista). */
-export interface SimConfig extends Omit<StrategyConfig, 'rsiFilter'> {
+export interface SimConfig extends Omit<StrategyConfig, 'rsiFilter' | 'trendFilter' | 'trendPeriod'> {
   initialCapital: number;
   allowedInst: InstId[];
   allowedTf: Timeframe[];

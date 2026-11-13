@@ -16,7 +16,8 @@ const WORKING = [
   'Resultado bruto e líquido por operação, saldo, taxa de acerto, drawdown e gráficos.',
   'Backtest com histórico real da OKX e exportação CSV.',
   'Validação (Fase 3): treino × teste, otimização só no treino, janelas sucessivas, comparação com comprar e segurar e 300 simulações aleatórias, veredito objetivo e histórico de validações.',
-  'Matriz BTC/ETH × 5m/15m/1h/4h com os mesmos parâmetros.',
+  'Matriz BTC/ETH × 5m/15m/1h/4h com os mesmos parâmetros e histórico das últimas 5 execuções para comparar.',
+  'Filtro de tendência (SMA50/100/200) no Analista, Backtest, Validação e Matriz.',
   'Métricas: resultado bruto e líquido, maior sequência de perdas, média por operação.',
   'Configurações e históricos salvos no LocalStorage.',
 ];
@@ -74,6 +75,10 @@ export function SettingsPage() {
             </div>
           </div>
           <Toggle label="Filtro RSI" hint="Bloqueia LONG com RSI ≥ 70 e SHORT com RSI ≤ 30" checked={cfg.rsiFilter} onChange={(v) => setAnalystConfig({ ...cfg, rsiFilter: v })} />
+          <Toggle label="Filtro de tendência" hint="LONG só com preço acima da média longa; SHORT só abaixo" checked={cfg.trendFilter} onChange={(v) => setAnalystConfig({ ...cfg, trendFilter: v })} />
+          {cfg.trendFilter && (
+            <Segmented options={[{ id: 50, label: 'SMA50' }, { id: 100, label: 'SMA100' }, { id: 200, label: 'SMA200' }]} value={cfg.trendPeriod} onChange={(v) => setAnalystConfig({ ...cfg, trendPeriod: v })} />
+          )}
           <p className="text-[11px] text-zinc-500">Alertas sonoros e notificações ficam na aba Analista. Risco, alavancagem e limites ficam na aba Simulador.</p>
         </div>
       </Card>

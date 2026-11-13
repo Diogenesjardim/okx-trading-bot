@@ -154,6 +154,7 @@ export function onPrice(s: SimState, instId: InstId, price: number, now: number)
 
 /** Validação pura de um sinal para ENTRADA. Retorna o motivo da rejeição ou null se válido. */
 export function entryRejection(s: SimState, r: SignalRecord, now: number): string | null {
+  if (r.blockedByTrend) return 'Bloqueado pelo filtro de tendência do Robô Analista (sinal contra a SMA longa)';
   if (r.blockedByRsi) return 'Bloqueado pelo filtro RSI do Robô Analista';
   if (s.mode === 'PAUSADO') return 'Simulador pausado';
   if (s.mode === 'ENCERRADO') return 'Simulação encerrada';

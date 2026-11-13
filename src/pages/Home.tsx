@@ -3,6 +3,7 @@ import { INSTRUMENTS, instLabel } from '../types';
 import { useBots } from '../hooks/BotsContext';
 import { computeStats } from '../lib/metrics';
 import { dailyUsage, simPhase, unrealized } from '../lib/simEngine';
+import { blockLabel, isBlocked } from '../lib/analystEngine';
 import { fmtDateTime, fmtPct, fmtPrice, fmtSignedUSD, fmtTime, fmtUSD, pnlColor } from '../lib/format';
 import { Card, ErrorBox, Notice, SideBadge, Stat } from '../components/ui';
 import { CsvButtons, ReportCharts, StatsGrid } from '../components/Report';
@@ -47,7 +48,7 @@ export function Home({ go }: { go: (r: Route) => void }) {
         {lastSignal ? (
           <div>
             <div className="flex items-center justify-between gap-2">
-              {lastSignal.blockedByRsi ? <span className="text-xs font-bold text-zinc-400">{lastSignal.side} bloqueado (RSI)</span> : <SignalPill signal={lastSignal.side} />}
+              {isBlocked(lastSignal) ? <span className="text-xs font-bold text-zinc-400">{lastSignal.side} bloqueado ({blockLabel(lastSignal)})</span> : <SignalPill signal={lastSignal.side} />}
               <span className="text-[11px] text-zinc-500">{fmtDateTime(lastSignal.closeTime)}</span>
             </div>
             <div className="mt-1.5 text-sm text-zinc-200">{instLabel(lastSignal.instId)} · {lastSignal.tf} · preço {fmtPrice(lastSignal.price)}</div>

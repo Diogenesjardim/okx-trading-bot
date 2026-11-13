@@ -214,3 +214,18 @@ describe('Robô Simulador — máquina de estados', () => {
     expect(s.mode).toBe('ATIVO');
   });
 });
+
+describe('filtro de tendência no Analista e Simulador', () => {
+  it('cruzamento de alta abaixo da SMA longa é bloqueado e explicado', () => {
+    const closes = [...Array.from({ length: 400 }, (_, i) => 1000 - 2 * i), 392]; // queda longa + salto que cruza as médias curtas, mas abaixo da SMA200
+    const cs: Candle[] = closes.map((c, i) => ({ ts: T0 + i * M15, open: c, high: c + 1, low: c - 1, close: c, volume: 1, confirmed: true }));
+    const r = analyzeStream({ instId: 'ETH-USDT', tf: '15m', candles: cs, lastProcessedTs: undefined, rsiFilter: false, trendFilter: true, trendPeriod: 200, risk: { stopLossPct: 2, takeProfitPct: 4 }, now: T0 });
+    expect(r.snapshot.cross).toBe('UP');
+    expect(r.snapshot.signal).toBe('AGUARDAR');
+    expect(r.record?.blockedByTrend).toBe(true);
+    expect(r.snapshot.reason).toContain('SMA200');
+    const out = Sim.onSignal(activeSim(), { ...mkSignal(), blockedByTrend: true }, T0 + M15 + 2000);
+    expect(out.decisions[0].reason).toContain('tendência');
+    expect(out.state.position).toBeNull();
+  });
+});

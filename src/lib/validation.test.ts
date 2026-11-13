@@ -88,3 +88,23 @@ describe('validação', () => {
     expect(() => validate(series(100), cfg, { splitPct: 70, windows: 3 })).toThrow();
   });
 });
+
+describe('filtro de tendência', () => {
+  it('reduz ou mantém o número de operações e exige aquecimento maior', async () => {
+    const { warmupFor } = await import('./validation');
+    const cs = series(800, 0.05); // tendência de alta
+    const sem = runBacktest(cs, cfg);
+    const com = runBacktest(cs, { ...cfg, trendFilter: true, trendPeriod: 200 });
+    expect(com.trades.length).toBeLessThanOrEqual(sem.trades.length);
+    // nenhuma operação antes de existir a SMA200
+    com.trades.forEach((t) => expect(t.entryTime).toBeGreaterThan(cs[199].ts));
+    expect(warmupFor({ trendFilter: true, trendPeriod: 200 })).toBeGreaterThanOrEqual(205);
+    expect(warmupFor({ trendFilter: false })).toBe(WARMUP);
+  });
+
+  it('em tendência de alta forte, não abre SHORT', () => {
+    const cs = series(800, 0.3);
+    const com = runBacktest(cs, { ...cfg, trendFilter: true, trendPeriod: 200 });
+    expect(com.trades.every((t) => t.side === 'LONG')).toBe(true);
+  });
+});

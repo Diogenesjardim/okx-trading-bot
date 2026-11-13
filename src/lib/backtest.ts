@@ -31,7 +31,7 @@ export interface BacktestResult {
  */
 export function runBacktest(candlesIn: Candle[], cfg: BacktestConfig): BacktestResult {
   const candles = candlesIn.filter((c) => c.confirmed);
-  const ind = computeIndicators(candles);
+  const ind = computeIndicators(candles, cfg.trendPeriod);
   const trades: Trade[] = [];
   let equity = cfg.initialCapital;
   let pos: Position | null = null;
@@ -79,7 +79,7 @@ export function runBacktest(candlesIn: Candle[], cfg: BacktestConfig): BacktestR
 
     // 3) Sinal no fechamento deste candle → executa no próximo
     if (i === candles.length - 1) break;
-    const s = signalAt(ind, i, cfg.rsiFilter);
+    const s = signalAt(ind, i, { rsiFilter: cfg.rsiFilter, trendFilter: cfg.trendFilter });
     if (s.cross) {
       if (pos) {
         const opposite = (pos.side === 'LONG' && s.cross === 'DOWN') || (pos.side === 'SHORT' && s.cross === 'UP');

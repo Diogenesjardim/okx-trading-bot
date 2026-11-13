@@ -1,40 +1,57 @@
 import type { Candle, Signal } from '../types';
 import { crossAt, rsi, sma, type Cross, type Series } from './indicators';
 
+export const DEFAULT_TREND_PERIOD = 200;
+
 export interface Indicators {
   closes: number[];
   sma9: Series;
   sma21: Series;
   rsi14: Series;
+  smaTrend: Series;
+  trendPeriod: number;
 }
 
-export function computeIndicators(candles: Candle[]): Indicators {
+export function computeIndicators(candles: Candle[], trendPeriod = DEFAULT_TREND_PERIOD): Indicators {
   const closes = candles.map((c) => c.close);
-  return { closes, sma9: sma(closes, 9), sma21: sma(closes, 21), rsi14: rsi(closes, 14) };
+  return { closes, sma9: sma(closes, 9), sma21: sma(closes, 21), rsi14: rsi(closes, 14), smaTrend: sma(closes, trendPeriod), trendPeriod };
+}
+
+export interface SignalFilters {
+  rsiFilter: boolean;
+  trendFilter?: boolean;
 }
 
 export interface SignalResult {
   signal: Signal;
   cross: Cross;
   blockedByRsi: boolean;
+  blockedByTrend: boolean;
 }
+
+const NONE: SignalResult = { signal: 'AGUARDAR', cross: null, blockedByRsi: false, blockedByTrend: false };
 
 /**
  * Estratégia SMA9/SMA21: só gera LONG/SHORT quando há um NOVO cruzamento no candle i.
- * Filtro RSI opcional: não compra com RSI ≥ 70 nem vende com RSI ≤ 30.
+ * Filtro RSI (opcional): não compra com RSI ≥ 70 nem vende com RSI ≤ 30.
+ * Filtro de tendência (opcional): LONG só com fechamento ACIMA da SMA longa; SHORT só ABAIXO.
+ *   Sem dados suficientes para a SMA longa → bloqueia (conservador).
  */
-export function signalAt(ind: Indicators, i: number, rsiFilter: boolean): SignalResult {
+export function signalAt(ind: Indicators, i: number, f: SignalFilters | boolean): SignalResult {
+  const filters: SignalFilters = typeof f === 'boolean' ? { rsiFilter: f } : f;
   const cross = crossAt(ind.sma9, ind.sma21, i);
+  if (!cross) return NONE;
+  const side = cross === 'UP' ? 'LONG' : 'SHORT';
   const r = ind.rsi14[i];
-  if (cross === 'UP') {
-    if (rsiFilter && r != null && r >= 70) return { signal: 'AGUARDAR', cross, blockedByRsi: true };
-    return { signal: 'LONG', cross, blockedByRsi: false };
+  const blockedByRsi = filters.rsiFilter && r != null && (side === 'LONG' ? r >= 70 : r <= 30);
+  let blockedByTrend = false;
+  if (filters.trendFilter) {
+    const t = ind.smaTrend[i];
+    const c = ind.closes[i];
+    blockedByTrend = t == null || (side === 'LONG' ? c <= t : c >= t);
   }
-  if (cross === 'DOWN') {
-    if (rsiFilter && r != null && r <= 30) return { signal: 'AGUARDAR', cross, blockedByRsi: true };
-    return { signal: 'SHORT', cross, blockedByRsi: false };
-  }
-  return { signal: 'AGUARDAR', cross: null, blockedByRsi: false };
+  const blocked = blockedByRsi || blockedByTrend;
+  return { signal: blocked ? 'AGUARDAR' : side, cross, blockedByRsi, blockedByTrend };
 }
 
 export interface Analysis {
@@ -71,7 +88,7 @@ export function analyze(allCandles: Candle[], rsiFilter: boolean): Analysis {
     sma21: s21,
     rsi: i >= 0 ? ind.rsi14[i] : null,
     trend: s9 == null || s21 == null ? 'indefinida' : s9 > s21 ? 'alta' : 'baixa',
-    signal: n ? signalAt(ind, i, rsiFilter) : { signal: 'AGUARDAR', cross: null, blockedByRsi: false },
+    signal: n ? signalAt(ind, i, rsiFilter) : NONE,
     lastCross,
   };
 }

@@ -143,14 +143,14 @@ export function SimulatorPage() {
             <NumberField label="Perda máx. diária" suffix="%" step={1} value={draft.maxDailyLossPct} onChange={(v) => setDraft({ ...draft, maxDailyLossPct: v })} disabled={locked} hint="% do capital inicial" />
             <NumberField label="Operações por dia" step={1} min={1} value={draft.maxTradesPerDay} onChange={(v) => setDraft({ ...draft, maxTradesPerDay: v })} disabled={locked} />
           </div>
-          <StrategyFields hideRsi value={{ ...draft, rsiFilter: false }} onChange={({ rsiFilter: _r, ...v }) => setDraft({ ...draft, ...v })} disabled={locked} />
+          <StrategyFields hideRsi value={{ ...draft, rsiFilter: false }} onChange={({ rsiFilter: _r, trendFilter: _t, trendPeriod: _p, ...v }) => setDraft({ ...draft, ...v })} disabled={locked} />
           {errors.length > 0 && <ul className="text-[11px] text-rose-400">{errors.map((e) => <li key={e}>• {e}</li>)}</ul>}
           <div className="flex gap-2">
             <button onClick={save} disabled={locked || !dirty || errors.length > 0} className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Salvar configurações</button>
             <button onClick={() => setDraft(sim.config)} disabled={!dirty} className="rounded-xl bg-zinc-800 px-4 text-sm disabled:opacity-40">Desfazer</button>
           </div>
           {msg && <p className="text-[11px] text-emerald-400">{msg}</p>}
-          <p className="text-[11px] text-zinc-500">O filtro RSI é configurado no Robô Analista (aba Config.).</p>
+          <p className="text-[11px] text-zinc-500">Os filtros RSI e de tendência são configurados no Robô Analista (aba Config.).</p>
         </div>
       </Card>
 

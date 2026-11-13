@@ -10,9 +10,13 @@ import { closePosition, openPosition } from './tradeMath';
 
 export const WARMUP = 40; // candles de aquecimento para SMA21/RSI14
 
+/** Aquecimento necessário: maior quando o filtro de tendência (SMA longa) está ligado. */
+export const warmupFor = (cfg: Pick<BacktestConfig, 'trendFilter' | 'trendPeriod'>) =>
+  cfg.trendFilter ? Math.max(WARMUP, (cfg.trendPeriod ?? 200) + 5) : WARMUP;
+
 /** Backtest num intervalo [start, end) usando candles anteriores só como aquecimento. */
 export function backtestWindow(candles: Candle[], start: number, end: number, cfg: BacktestConfig): BacktestResult {
-  const from = Math.max(0, start - WARMUP);
+  const from = Math.max(0, start - warmupFor(cfg));
   return runBacktest(candles.slice(from, end), { ...cfg, tradeFromTs: candles[start].ts });
 }
 
@@ -191,8 +195,9 @@ export interface ValidationResult {
 
 export function validate(candles: Candle[], cfg: BacktestConfig, opts: { splitPct: number; windows: number; randomRuns?: number }): ValidationResult {
   const n = candles.length;
-  if (n < WARMUP + 100) throw new Error(`São necessários pelo menos ${WARMUP + 100} candles para validar.`);
-  const start = WARMUP;
+  const warm = warmupFor(cfg);
+  if (n < warm + 100) throw new Error(`São necessários pelo menos ${warm + 100} candles para validar${cfg.trendFilter ? ' com o filtro de tendência' : ''}.`);
+  const start = warm;
   const split = Math.floor(start + (n - start) * (opts.splitPct / 100));
 
   const full = backtestWindow(candles, start, n, cfg);

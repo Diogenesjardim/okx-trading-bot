@@ -3,7 +3,7 @@ import { instLabel, streamKey, type Candle, type InstId, type SimConfig, type Ti
 import { getCandles, getTicker } from '../lib/okx';
 import { KEYS, load, save } from '../lib/storage';
 import {
-  addAnalystLog, analyzeStream, analystStatus, initialAnalystState,
+  addAnalystLog, analyzeStream, analystStatus, initialAnalystState, isBlocked,
   type AnalystConfig, type AnalystState, type AnalystStatus, type SignalRecord,
 } from '../lib/analystEngine';
 import * as Sim from '../lib/simEngine';
@@ -103,7 +103,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
 
       const [tickRes, candleRes] = await Promise.all([
         Promise.allSettled([...insts].map((i) => getTicker(i))),
-        Promise.allSettled(streams.map(([i, tf]) => getCandles(i, tf, 100))),
+        Promise.allSettled(streams.map(([i, tf]) => getCandles(i, tf, a0.config.trendFilter ? 300 : 100))),
       ]);
       const now = Date.now();
 
@@ -152,7 +152,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
           const key = streamKey(instId, tf);
           const cs = newCandles[key];
           if (!cs) continue;
-          const r = analyzeStream({ instId, tf, candles: cs, lastProcessedTs: lastProcessed[key], rsiFilter: a.config.rsiFilter, risk, now });
+          const r = analyzeStream({ instId, tf, candles: cs, lastProcessedTs: lastProcessed[key], rsiFilter: a.config.rsiFilter, trendFilter: a.config.trendFilter, trendPeriod: a.config.trendPeriod, risk, now });
           snapshots[key] = r.snapshot;
           if (r.lastProcessedTs != null) lastProcessed[key] = r.lastProcessedTs;
           if (r.record && !known.has(r.record.id)) fresh.push(r.record);
@@ -171,7 +171,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
 
       // 6) alertas sem duplicar
       const { analyst } = store.current;
-      const toNotify = fresh.filter((r) => !r.blockedByRsi && !analyst.notifiedIds.includes(r.id));
+      const toNotify = fresh.filter((r) => !isBlocked(r) && !analyst.notifiedIds.includes(r.id));
       if (toNotify.length) {
         for (const r of toNotify) {
           if (analyst.config.sound) beep(r.side);

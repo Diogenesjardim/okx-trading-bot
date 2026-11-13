@@ -14,7 +14,7 @@ type Cfg = BacktestConfig & { candles: number; splitPct: number; windows: number
 const DEFAULT: Cfg = {
   instId: 'ETH-USDT', timeframe: '15m', initialCapital: 100, candles: 2000, splitPct: 70, windows: 5,
   leverage: 1, stopLossPct: 1.5, takeProfitPct: 3, positionSizePct: 100, feePct: 0.05, slippagePct: 0.03,
-  rsiFilter: true, exitOnOppositeCross: true,
+  rsiFilter: true, trendFilter: false, trendPeriod: 200, exitOnOppositeCross: true,
 };
 
 interface SavedRun {
@@ -35,7 +35,7 @@ export const SUMMARY: Record<ValidationResult['summary'], { label: string; cls: 
   promissora: { label: 'Promissora — continue testando', cls: 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30', desc: 'Passou nos critérios deste teste. Não garante resultado futuro: valide em simulação contínua.' },
 };
 
-const paramsText = (c: BacktestConfig) => `${c.leverage}X · SL ${c.stopLossPct}% · TP ${c.takeProfitPct}% · ${c.rsiFilter ? 'RSI on' : 'RSI off'}`;
+const paramsText = (c: BacktestConfig) => `${c.leverage}X · SL ${c.stopLossPct}% · TP ${c.takeProfitPct}% · ${c.rsiFilter ? 'RSI on' : 'RSI off'}${c.trendFilter ? ` · tendência SMA${c.trendPeriod ?? 200}` : ''}${c.exitOnOppositeCross ? '' : ' · só SL/TP'}`;
 
 export function Validation() {
   const [cfg, setCfg] = useState<Cfg>(() => ({ ...DEFAULT, ...load(KEYS.validationCfg, {}) }));

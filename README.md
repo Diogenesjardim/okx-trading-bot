@@ -27,6 +27,12 @@ React 19 + TypeScript + Vite · Tailwind CSS v4 · Recharts · Lucide React · L
 `PAUSADO ⇄ ATIVO → ENCERRADO → (Iniciar) ATIVO`; fases exibidas: aguardando sinal, posição aberta, bloqueado por limite, pausado, encerrado.
 Garantias (testadas): 1 posição por vez · cada sinal avaliado uma vez (`processedSignalIds`) · cada candle processado uma vez (`lastProcessed`) · sinal anterior ao início ou com mais de 1 período de atraso é rejeitado · SL/TP seguem monitorados mesmo pausado.
 
+## Filtros da estratégia
+- **RSI:** não compra com RSI ≥ 70 nem vende com RSI ≤ 30.
+- **Tendência (SMA50/100/200):** LONG só com fechamento acima da média longa; SHORT só abaixo. Sem dados suficientes para a média → não opera (conservador).
+- **Saída no cruzamento oposto:** pode ser desligada para sair só por SL/TP.
+Disponíveis no Backtest, Validação e Matriz (comparar execuções salvas) e no Robô Analista (Config.).
+
 ## Validação de estratégia (Fase 3) — `src/lib/validation.ts`
 - **Treino × teste:** divide o histórico (60/70/80%). O teste usa dados que não serviram para escolher nada.
 - **Otimização só no treino:** 16 combinações de SL/TP; a melhor é aplicada no teste (detecta sobreajuste).

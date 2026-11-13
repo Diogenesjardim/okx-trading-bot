@@ -40,6 +40,23 @@ export function StrategyFields({ value, onChange, disabled, hideRsi }: {
         <NumberField label="Slippage" suffix="%" step={0.01} value={value.slippagePct} onChange={(v) => set('slippagePct', v)} disabled={disabled} />
       </div>
       {!hideRsi && <Toggle label="Filtro RSI" hint="Não compra com RSI ≥ 70 nem vende com RSI ≤ 30" checked={value.rsiFilter} onChange={(v) => set('rsiFilter', v)} disabled={disabled} />}
+      {!hideRsi && (
+        <Toggle
+          label={`Filtro de tendência (SMA${value.trendPeriod ?? 200})`}
+          hint="LONG só com preço acima da média longa; SHORT só abaixo. Reduz operações contra a tendência."
+          checked={!!value.trendFilter}
+          onChange={(v) => onChange({ ...value, trendFilter: v, trendPeriod: value.trendPeriod ?? 200 })}
+          disabled={disabled}
+        />
+      )}
+      {!hideRsi && value.trendFilter && (
+        <div>
+          <span className="text-xs text-zinc-400">Período da média longa</span>
+          <div className="mt-1">
+            <Segmented disabled={disabled} options={[{ id: 50, label: 'SMA50' }, { id: 100, label: 'SMA100' }, { id: 200, label: 'SMA200' }]} value={value.trendPeriod ?? 200} onChange={(v) => onChange({ ...value, trendPeriod: v })} />
+          </div>
+        </div>
+      )}
       <Toggle label="Sair no cruzamento oposto" hint="Encerra a posição quando as médias cruzam no sentido contrário" checked={value.exitOnOppositeCross} onChange={(v) => set('exitOnOppositeCross', v)} disabled={disabled} />
     </div>
   );

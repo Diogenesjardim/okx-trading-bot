@@ -27,19 +27,25 @@ interface Saved {
 
 const DEFAULTS: BacktestConfig = {
   instId: 'ETH-USDT', timeframe: '15m', initialCapital: 100, leverage: 1, stopLossPct: 1.5, takeProfitPct: 3,
-  positionSizePct: 100, feePct: 0.05, slippagePct: 0.03, rsiFilter: true, exitOnOppositeCross: true,
+  positionSizePct: 100, feePct: 0.05, slippagePct: 0.03, rsiFilter: true, trendFilter: false, trendPeriod: 200, exitOnOppositeCross: true,
 };
 
 export function Matrix() {
   const [candles, setCandles] = useState(1000);
   const [progress, setProgress] = useState<string | null>(null);
-  const [saved, setSaved] = useState<Saved | null>(() => load(KEYS.matrix, null));
+  const [history, setHistory] = useState<Saved[]>(() => {
+    const v = load<Saved | Saved[] | null>(KEYS.matrix, null);
+    return Array.isArray(v) ? v : v ? [v] : [];
+  });
+  const [sel, setSel] = useState(0);
+  const saved = history[sel] ?? null;
 
   const run = async () => {
     // usa os mesmos parâmetros de estratégia da aba Validação
     const base = { ...DEFAULTS, ...load<Partial<BacktestConfig>>(KEYS.validationCfg, {}) };
-    const params = `${base.leverage}X · SL ${base.stopLossPct}% · TP ${base.takeProfitPct}% · taxa ${base.feePct}% · ${base.rsiFilter ? 'RSI on' : 'RSI off'}`;
+    const params = `${base.leverage}X · SL ${base.stopLossPct}% · TP ${base.takeProfitPct}% · taxa ${base.feePct}% · ${base.rsiFilter ? 'RSI on' : 'RSI off'}${base.trendFilter ? ` · tendência SMA${base.trendPeriod ?? 200}` : ''}${base.exitOnOppositeCross ? '' : ' · só SL/TP'}`;
     const rows: Row[] = [];
+    const startedAt = Date.now();
     const combos = INSTRUMENTS.flatMap((i) => TIMEFRAMES.map((t) => [i.id, t.id] as [InstId, Timeframe]));
     for (let k = 0; k < combos.length; k++) {
       const [instId, tf] = combos[k];
@@ -60,9 +66,13 @@ export function Matrix() {
       } catch (e) {
         rows.push({ instId, tf, error: e instanceof Error ? e.message : 'Falha' });
       }
-      const snapshot: Saved = { at: Date.now(), candles, params, rows: [...rows] };
-      setSaved(snapshot);
-      save(KEYS.matrix, snapshot);
+      const snapshot: Saved = { at: startedAt, candles, params, rows: [...rows] };
+      setHistory((h) => {
+        const next = [snapshot, ...h.filter((x) => x.at !== startedAt)].slice(0, 5);
+        save(KEYS.matrix, next);
+        return next;
+      });
+      setSel(0);
     }
     setProgress(null);
   };
@@ -83,7 +93,20 @@ export function Matrix() {
 
       {saved && (
         <Card title="Resultado" right={<span className="text-[11px] text-zinc-500">{fmtDateTime(saved.at)}</span>}>
+          {history.length > 1 && (
+            <div className="mb-3">
+              <span className="text-[11px] text-zinc-500">Execuções salvas (compare com e sem filtros):</span>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {history.map((h, i) => (
+                  <button key={h.at} onClick={() => setSel(i)} className={`rounded-lg px-2.5 py-1 text-[11px] ring-1 ${i === sel ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/40' : 'bg-zinc-950 text-zinc-400 ring-zinc-800'}`}>
+                    {fmtDateTime(h.at).slice(-5)}{h.params.includes('tendência') ? ' · tendência' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <p className="mb-2 text-[11px] text-zinc-500">{saved.params} · até {saved.candles} candles · treino/teste 70/30 · 4 janelas</p>
+          <MatrixSummary rows={saved.rows} />
           <Table
             head={['Mercado', 'Ops', 'Acerto', 'Total', 'Teste', 'Janelas +', 'Vs. aleatório', 'Comprar e segurar', 'Evidência']}
             rows={saved.rows.map((row) =>
@@ -109,5 +132,20 @@ export function Matrix() {
         Comparar 8 mercados aumenta a chance de um deles parecer bom só por sorte. Um resultado isolado positivo na matriz deve ser confirmado na aba Validação com mais histórico e depois em simulação contínua.
       </Notice>
     </>
+  );
+}
+
+function MatrixSummary({ rows }: { rows: Row[] }) {
+  const ok = rows.filter((r) => r.r);
+  if (!ok.length) return null;
+  const avg = ok.reduce((a, r) => a + r.r!.pct, 0) / ok.length;
+  const pos = ok.filter((r) => r.r!.pct > 0).length;
+  const ops = ok.reduce((a, r) => a + r.r!.trades, 0);
+  return (
+    <div className="mb-3 grid grid-cols-3 gap-2 text-center text-xs">
+      <div className="rounded-lg bg-zinc-950/60 p-2 ring-1 ring-zinc-800"><div className="text-zinc-500">Média total</div><div className={`font-semibold ${pnlColor(avg)}`}>{fmtPct(avg, 1, true)}</div></div>
+      <div className="rounded-lg bg-zinc-950/60 p-2 ring-1 ring-zinc-800"><div className="text-zinc-500">Mercados +</div><div className="font-semibold">{pos}/{ok.length}</div></div>
+      <div className="rounded-lg bg-zinc-950/60 p-2 ring-1 ring-zinc-800"><div className="text-zinc-500">Operações</div><div className="font-semibold">{ops}</div></div>
+    </div>
   );
 }
