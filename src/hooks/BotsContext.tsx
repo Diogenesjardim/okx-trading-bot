@@ -8,7 +8,7 @@ import {
 } from '../lib/analystEngine';
 import * as Sim from '../lib/simEngine';
 import { beep, showNotification } from '../lib/alerts';
-import { DEFAULT_DEMO, demoActions, demoCall, openPayload, type DemoConfig, type DemoLog, type DemoState, type DemoStatus } from '../lib/okxDemo';
+import { DEFAULT_DEMO, closePayload, demoActions, demoCall, openPayload, type DemoConfig, type DemoLog, type DemoState, type DemoStatus } from '../lib/okxDemo';
 
 /**
  * ORQUESTRADOR — integra os dois robôs a cada ciclo:
@@ -58,8 +58,6 @@ interface Ctx {
   demoBusy: boolean;
   setDemoConfig: (c: DemoConfig) => void;
   refreshDemo: () => Promise<void>;
-  prepareDemo: () => Promise<void>;
-  closeDemo: (instId: InstId) => Promise<void>;
   setAnalystEnabled: (v: boolean) => void;
   setAnalystConfig: (c: AnalystConfig) => void;
   clearSignals: () => void;
@@ -86,7 +84,10 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   const busy = useRef(false);
 
   // ---------- Executor DEMO (conta de teste da OKX) ----------
-  const demoRef = useRef<DemoState>({ ...DEFAULT_DEMO, ...load<Partial<DemoState>>(KEYS.demo, {}) });
+  const demoRef = useRef<DemoState>((() => {
+    const saved = load<Partial<DemoState>>(KEYS.demo, {});
+    return { ...DEFAULT_DEMO, ...saved, config: { ...DEFAULT_DEMO.config, ...(saved.config ?? {}) } };
+  })());
   const [demo, setDemoState] = useState<DemoState>(demoRef.current);
   const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
@@ -107,12 +108,16 @@ export function BotsProvider({ children }: { children: ReactNode }) {
       updateDemo((d) => ({ ...d, handled: [key, ...d.handled].slice(0, 400) }));
       const label = `${a.pos.side} ${instLabel(a.pos.instId)}`;
       try {
+        if (a.pos.side === 'SHORT') {
+          demoLog({ action: a.type === 'open' ? 'abrir' : 'fechar', ok: false, msg: `${label}: conta à vista não permite SHORT — nada enviado. Ative "Somente LONG" no Simulador.` });
+          continue;
+        }
         if (a.type === 'close') {
-          const r = await demoCall<{ message: string }>(cfg, 'close', { instId: a.pos.instId });
+          const r = await demoCall<{ message: string }>(cfg, 'close', closePayload(a.pos, cfg));
           demoLog({ action: 'fechar', ok: true, msg: `${label}: ${r.message}` });
         } else {
-          const r = await demoCall<{ ordId: string; sz: string; swapId: string; refPrice: number }>(cfg, 'open', openPayload(a.pos));
-          demoLog({ action: 'abrir', ok: true, msg: `${label}: ordem ${r.ordId} enviada (${r.sz} contratos ${r.swapId}, ~${r.refPrice}) com SL/TP na OKX.` });
+          const r = await demoCall<{ ordId: string; instId: string; refPrice: number; stop: string; take: string; duplicate?: boolean; message?: string }>(cfg, 'open', openPayload(a.pos, cfg));
+          demoLog({ action: 'abrir', ok: true, msg: r.duplicate ? `${label}: ${r.message}` : `${label}: compra de ${cfg.orderValue} ${cfg.quote} em ${r.instId} (~${r.refPrice}) enviada · SL ${r.stop} · TP ${r.take} na OKX (ordem ${r.ordId}).` });
         }
       } catch (e) {
         demoLog({ action: a.type === 'open' ? 'abrir' : 'fechar', ok: false, msg: `${label}: ${e instanceof Error ? e.message : 'falha'}` });
@@ -294,34 +299,10 @@ export function BotsProvider({ children }: { children: ReactNode }) {
     refreshDemo: async () => {
       setDemoBusy(true);
       try {
-        setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status'));
+        setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status', { quote: demoRef.current.config.quote }));
       } catch (e) {
         setDemoStatus(null);
         demoLog({ action: 'status', ok: false, msg: e instanceof Error ? e.message : 'falha' });
-      } finally {
-        setDemoBusy(false);
-      }
-    },
-    prepareDemo: async () => {
-      setDemoBusy(true);
-      try {
-        const r = await demoCall<{ done: string[] }>(demoRef.current.config, 'prepare');
-        demoLog({ action: 'preparar', ok: true, msg: r.done.join(' ') });
-        setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status'));
-      } catch (e) {
-        demoLog({ action: 'preparar', ok: false, msg: e instanceof Error ? e.message : 'falha' });
-      } finally {
-        setDemoBusy(false);
-      }
-    },
-    closeDemo: async (instId) => {
-      setDemoBusy(true);
-      try {
-        const r = await demoCall<{ message: string }>(demoRef.current.config, 'close', { instId });
-        demoLog({ action: 'fechar', ok: true, msg: r.message });
-        setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status'));
-      } catch (e) {
-        demoLog({ action: 'fechar', ok: false, msg: e instanceof Error ? e.message : 'falha' });
       } finally {
         setDemoBusy(false);
       }

@@ -29,7 +29,8 @@ export interface BacktestResult {
  * - Gap além do stop: executa na abertura (pior preço).
  * - Uma posição por vez.
  */
-export function runBacktest(candlesIn: Candle[], cfg: BacktestConfig): BacktestResult {
+export function runBacktest(candlesIn: Candle[], cfgIn: BacktestConfig): BacktestResult {
+  const cfg: BacktestConfig = cfgIn.longOnly ? { ...cfgIn, leverage: 1 } : cfgIn; // spot = sem alavancagem
   const candles = candlesIn.filter((c) => c.confirmed);
   const ind = computeIndicators(candles, cfg.trendPeriod);
   const trades: Trade[] = [];
@@ -87,7 +88,8 @@ export function runBacktest(candlesIn: Candle[], cfg: BacktestConfig): BacktestR
         else signalsIgnored++;
       }
       const allowed = cfg.tradeFromTs == null || c.ts >= cfg.tradeFromTs;
-      if (allowed && s.signal !== 'AGUARDAR' && (!pos || pendingExit)) {
+      const sideOk = !(cfg.longOnly && s.signal === 'SHORT');
+      if (allowed && sideOk && s.signal !== 'AGUARDAR' && (!pos || pendingExit)) {
         pendingEntry = { side: s.signal, signalTs: c.ts };
       } else if (s.signal !== 'AGUARDAR' && pos) {
         // posição aberta sem saída por cruzamento: ignora o sinal

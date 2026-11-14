@@ -27,7 +27,7 @@ interface Saved {
 
 const DEFAULTS: BacktestConfig = {
   instId: 'ETH-USDT', timeframe: '15m', initialCapital: 100, leverage: 1, stopLossPct: 1.5, takeProfitPct: 3,
-  positionSizePct: 100, feePct: 0.05, slippagePct: 0.03, rsiFilter: true, trendFilter: false, trendPeriod: 200, exitOnOppositeCross: true,
+  positionSizePct: 100, feePct: 0.05, slippagePct: 0.03, rsiFilter: true, trendFilter: false, trendPeriod: 200, exitOnOppositeCross: true, longOnly: true,
 };
 
 export function Matrix() {
@@ -43,7 +43,7 @@ export function Matrix() {
   const run = async () => {
     // usa os mesmos parâmetros de estratégia da aba Validação
     const base = { ...DEFAULTS, ...load<Partial<BacktestConfig>>(KEYS.validationCfg, {}) };
-    const params = `${base.leverage}X · SL ${base.stopLossPct}% · TP ${base.takeProfitPct}% · taxa ${base.feePct}% · ${base.rsiFilter ? 'RSI on' : 'RSI off'}${base.trendFilter ? ` · tendência SMA${base.trendPeriod ?? 200}` : ''}${base.exitOnOppositeCross ? '' : ' · só SL/TP'}`;
+    const params = `${base.leverage}X · SL ${base.stopLossPct}% · TP ${base.takeProfitPct}% · taxa ${base.feePct}% · ${base.rsiFilter ? 'RSI on' : 'RSI off'}${base.trendFilter ? ` · tendência SMA${base.trendPeriod ?? 200}` : ''}${base.exitOnOppositeCross ? '' : ' · só SL/TP'}${base.longOnly ? ' · só LONG' : ''}`;
     const rows: Row[] = [];
     const startedAt = Date.now();
     const combos = INSTRUMENTS.flatMap((i) => TIMEFRAMES.map((t) => [i.id, t.id] as [InstId, Timeframe]));

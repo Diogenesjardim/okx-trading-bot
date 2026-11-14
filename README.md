@@ -43,7 +43,12 @@ Disponíveis no Backtest, Validação e Matriz (comparar execuções salvas) e n
 - **Matriz:** os 8 mercados de uma vez (atenção: muitos testes aumentam a chance de um parecer bom por sorte).
 - Limitação: o histórico público da OKX tem profundidade limitada; 3.000 candles de 15 min ≈ 1 mês.
 
+## Modo à vista (OKX Brasil)
+A conta brasileira da OKX só permite mercado **à vista (spot)**: sem futuros, sem SHORT, sem alavancagem (restrição da CVM a derivativos para brasileiros). Por isso o padrão agora é **Somente LONG**: sinal de compra abre, sinal de venda só **encerra** a compra. Disponível no Simulador, Backtest, Validação e Matriz.
+
 ## Ordens automáticas na conta DEMO da OKX — `supabase/functions/okx-demo`
+> Atualizado para o **Trading simulado à vista**: compra a mercado de ETH-BRL / BTC-BRL (ou pares USDT) com SL/TP anexados; saída = cancela SL/TP pendentes e vende o que a compra rendeu. Idempotente por sinal (clOrdId). Limites: 2000 BRL / 400 USDT por ordem.
+
 O Robô Simulador pode **espelhar cada posição** como ordem real na **conta Demo** da OKX (dinheiro fictício da OKX), com Stop Loss e Take Profit anexados à ordem — executados pela própria OKX, mesmo com o celular bloqueado.
 
 **Segurança**

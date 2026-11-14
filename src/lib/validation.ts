@@ -87,7 +87,7 @@ export function randomBacktest(candles: Candle[], start: number, end: number, cf
         pos = null;
       }
     }
-    if (!pos && i < end - 1 && rand() < opts.entryProb) pending = rand() < 0.5 ? 'LONG' : 'SHORT';
+    if (!pos && i < end - 1 && rand() < opts.entryProb) pending = cfg.longOnly ? (rand(), 'LONG') : rand() < 0.5 ? 'LONG' : 'SHORT';
   }
   return { pnl: equity - cfg.initialCapital, trades };
 }

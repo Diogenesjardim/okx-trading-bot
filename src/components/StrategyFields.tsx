@@ -19,11 +19,18 @@ export function StrategyFields({ value, onChange, disabled, hideRsi }: {
   const lossOnMargin = value.stopLossPct * value.leverage;
   return (
     <div className="space-y-3">
+      <Toggle
+        label="Somente LONG (mercado à vista)"
+        hint="Como na OKX Brasil: só compra, sem alavancagem. Sinal de venda apenas encerra a compra."
+        checked={!!value.longOnly}
+        onChange={(v) => onChange({ ...value, longOnly: v, leverage: v ? 1 : value.leverage })}
+        disabled={disabled}
+      />
       <div>
-        <span className="text-xs text-zinc-400">Alavancagem fictícia</span>
+        <span className="text-xs text-zinc-400">Alavancagem fictícia{value.longOnly ? ' (à vista = 1X)' : ''}</span>
         <div className="mt-1">
           <Segmented
-            disabled={disabled}
+            disabled={disabled || !!value.longOnly}
             options={[{ id: 1, label: '1X' }, { id: 2, label: '2X' }, { id: 3, label: '3X' }]}
             value={value.leverage}
             onChange={(v) => set('leverage', v as 1 | 2 | 3)}

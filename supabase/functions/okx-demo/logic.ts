@@ -1,15 +1,18 @@
 /**
  * Lógica pura do executor DEMO (sem APIs do Deno) — testada com Vitest no projeto do site.
+ * Modo À VISTA (spot): compra a mercado com TP/SL anexados; venda a mercado para sair.
  * O executor só opera na conta DEMO da OKX (cabeçalho x-simulated-trading: 1).
  */
 
-/** Pares do app → contratos perpétuos (SWAP) da OKX. Só estes são aceitos. */
-export const SWAP_OF: Record<string, string> = {
-  'ETH-USDT': 'ETH-USDT-SWAP',
-  'BTC-USDT': 'BTC-USDT-SWAP',
-};
+export const BASES = ['BTC', 'ETH'] as const;
+export const QUOTES = ['BRL', 'USDT'] as const;
 
-export const MAX_LEVERAGE = 3;
+/** "ETH-USDT" (par analisado) + "BRL" (moeda da conta) → "ETH-BRL" (par negociado). */
+export function spotInstId(analyzedInstId: string, quote: string): string | null {
+  const base = analyzedInstId.split('-')[0];
+  if (!(BASES as readonly string[]).includes(base) || !(QUOTES as readonly string[]).includes(quote)) return null;
+  return `${base}-${quote}`;
+}
 
 /** Assinatura OKX: Base64(HMAC-SHA256(secret, timestamp + MÉTODO + caminho[+query] + corpo)). */
 export async function signOkx(secret: string, timestamp: string, method: string, requestPath: string, body = ''): Promise<string> {
@@ -33,24 +36,15 @@ export function roundToTick(px: number, tickSz: string): string {
   return v.toFixed(decimalsOf(tickSz));
 }
 
-/**
- * Quantidade de contratos para uma margem em USDT.
- * contratos = margem × alavancagem / (preço × ctVal), arredondado PARA BAIXO ao lotSz.
- */
-export function contractsFor(a: { marginUsdt: number; leverage: number; price: number; ctVal: string; lotSz: string; minSz: string }):
-  { sz: string; notional: number } | { error: string } {
-  const ctVal = Number(a.ctVal);
-  const lot = Number(a.lotSz);
-  const min = Number(a.minSz);
-  if (!(a.price > 0) || !(ctVal > 0) || !(lot > 0)) return { error: 'Dados do instrumento inválidos.' };
-  const raw = (a.marginUsdt * a.leverage) / (a.price * ctVal);
-  const steps = Math.floor(raw / lot + 1e-9);
-  const sz = steps * lot;
-  if (sz < min - 1e-12) {
-    const minUsdt = (min * a.price * ctVal) / a.leverage;
-    return { error: `Valor abaixo do mínimo da OKX para este contrato (≈ ${minUsdt.toFixed(2)} USDT de margem com ${a.leverage}X).` };
-  }
-  return { sz: sz.toFixed(decimalsOf(a.lotSz)), notional: sz * a.price * ctVal };
+/** Arredonda uma quantidade PARA BAIXO ao lote (lotSz). */
+export function floorToLot(qty: number, lotSz: string): number {
+  const lot = Number(lotSz);
+  return Math.floor(qty / lot + 1e-9) * lot;
+}
+
+/** SL/TP a partir do preço atual do par negociado e dos % configurados no simulador. */
+export function levelsFromPct(price: number, stopLossPct: number, takeProfitPct: number) {
+  return { stop: price * (1 - stopLossPct / 100), take: price * (1 + takeProfitPct / 100) };
 }
 
 /** clOrdId da OKX: até 32 caracteres alfanuméricos. Derivado do id do sinal (idempotência). */
@@ -64,43 +58,51 @@ export function clOrdIdFrom(id: string): string {
   return ('okxbot' + h1.toString(36) + h2.toString(36)).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32);
 }
 
-export interface OpenRequest {
-  instId: string;
-  side: 'LONG' | 'SHORT';
-  marginUsdt: number;
-  leverage: number;
-  stopPrice: number;
-  takePrice: number;
-  ref: string; // id do sinal/posição no app
+export interface SpotOpenRequest {
+  instId: string; // par analisado, ex.: ETH-USDT
+  quote: 'BRL' | 'USDT'; // moeda da conta Demo
+  orderValue: number; // valor da compra, na moeda `quote`
+  stopLossPct: number;
+  takeProfitPct: number;
+  ref: string; // id do sinal/posição no app (vira o clOrdId)
 }
 
-export function validateOpenRequest(b: Partial<OpenRequest>, maxMargin: number): string[] {
+export function validateSpotOpen(b: Partial<SpotOpenRequest>, maxValue: Record<string, number>): string[] {
   const e: string[] = [];
-  if (!b.instId || !SWAP_OF[b.instId]) e.push('Ativo não permitido (somente BTC-USDT e ETH-USDT).');
-  if (b.side !== 'LONG' && b.side !== 'SHORT') e.push('Lado inválido.');
-  if (!(Number(b.marginUsdt) > 0)) e.push('Margem inválida.');
-  if (Number(b.marginUsdt) > maxMargin) e.push(`Margem acima do limite de segurança (${maxMargin} USDT).`);
-  if (!Number.isInteger(b.leverage) || b.leverage! < 1 || b.leverage! > MAX_LEVERAGE) e.push('Alavancagem deve ser 1, 2 ou 3.');
-  if (!(Number(b.stopPrice) > 0) || !(Number(b.takePrice) > 0)) e.push('Stop Loss e Take Profit são obrigatórios.');
+  if (!b.instId || !b.quote || !spotInstId(b.instId, b.quote)) e.push('Par não permitido (somente BTC ou ETH, em BRL ou USDT).');
+  const max = b.quote ? maxValue[b.quote] : undefined;
+  if (!(Number(b.orderValue) > 0)) e.push('Valor da ordem inválido.');
+  else if (max != null && Number(b.orderValue) > max) e.push(`Valor acima do limite de segurança (${max} ${b.quote}).`);
+  if (!(Number(b.stopLossPct) > 0 && Number(b.stopLossPct) < 50)) e.push('Stop Loss % inválido.');
+  if (!(Number(b.takeProfitPct) > 0 && Number(b.takeProfitPct) < 200)) e.push('Take Profit % inválido.');
   if (!b.ref) e.push('Referência ausente.');
   return e;
 }
 
-/** Corpo da ordem a mercado com SL/TP anexados (executados pela própria OKX). */
-export function buildOrder(a: {
-  swapId: string; side: 'LONG' | 'SHORT'; sz: string; stopPx: string; takePx: string; clOrdId: string; posMode: string;
-}) {
-  const order: Record<string, unknown> = {
-    instId: a.swapId,
-    tdMode: 'isolated',
-    side: a.side === 'LONG' ? 'buy' : 'sell',
+/** Compra a mercado gastando `orderValue` na moeda de cotação, com SL/TP executados pela OKX. */
+export function buildSpotBuy(a: { instId: string; orderValue: number; stopPx: string; takePx: string; clOrdId: string }) {
+  return {
+    instId: a.instId,
+    tdMode: 'cash',
+    side: 'buy',
     ordType: 'market',
-    sz: a.sz,
+    tgtCcy: 'quote_ccy', // sz = valor em BRL/USDT, não em moeda
+    sz: a.orderValue.toFixed(2),
     clOrdId: a.clOrdId,
     attachAlgoOrds: [
       { tpTriggerPx: a.takePx, tpOrdPx: '-1', tpTriggerPxType: 'last', slTriggerPx: a.stopPx, slOrdPx: '-1', slTriggerPxType: 'last' },
     ],
   };
-  if (a.posMode === 'long_short_mode') order.posSide = a.side === 'LONG' ? 'long' : 'short';
-  return order;
+}
+
+/**
+ * Quanto vender para encerrar a operação: o que a compra rendeu (já descontada a taxa cobrada na moeda),
+ * limitado ao saldo disponível e arredondado ao lote. null = nada a vender (ex.: SL/TP já executado na OKX).
+ */
+export function sellQty(a: { accFillSz: string; fee: string; feeCcy: string; base: string; availBal: number; lotSz: string; minSz: string }): string | null {
+  const filled = Number(a.accFillSz) || 0;
+  const feeInBase = a.feeCcy === a.base ? Math.abs(Number(a.fee) || 0) : 0;
+  const qty = floorToLot(Math.min(filled - feeInBase, a.availBal), a.lotSz);
+  if (!(qty > 0) || qty < Number(a.minSz) - 1e-12) return null;
+  return qty.toFixed(decimalsOf(a.lotSz));
 }

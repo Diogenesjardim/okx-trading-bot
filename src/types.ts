@@ -97,6 +97,8 @@ export interface StrategyConfig {
   trendFilter?: boolean;
   trendPeriod?: number; // padrão 200
   exitOnOppositeCross: boolean;
+  /** Mercado à vista (spot): só compra (LONG), 1X. Sinal de venda serve apenas para SAIR. */
+  longOnly?: boolean;
 }
 
 /** Configuração do Robô Simulador (o filtro RSI pertence ao Robô Analista). */

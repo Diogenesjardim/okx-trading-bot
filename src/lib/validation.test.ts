@@ -108,3 +108,19 @@ describe('filtro de tendência', () => {
     expect(com.trades.every((t) => t.side === 'LONG')).toBe(true);
   });
 });
+
+describe('modo só LONG (à vista)', () => {
+  it('backtest nunca abre SHORT e força 1X', () => {
+    const cs = series(600);
+    const both = runBacktest(cs, { ...cfg, leverage: 3 });
+    const long = runBacktest(cs, { ...cfg, leverage: 3, longOnly: true });
+    expect(both.trades.some((t) => t.side === 'SHORT')).toBe(true);
+    expect(long.trades.length).toBeGreaterThan(0);
+    expect(long.trades.every((t) => t.side === 'LONG' && t.leverage === 1)).toBe(true);
+  });
+  it('referência aleatória também só compra', () => {
+    const cs = series(500);
+    const r = randomBacktest(cs, WARMUP, 500, { ...cfg, longOnly: true }, { entryProb: 0.05, maxHoldBars: 10, seed: 7 });
+    expect(r.trades).toBeGreaterThan(0);
+  });
+});

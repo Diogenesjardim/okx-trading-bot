@@ -52,6 +52,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = {
   feePct: 0.05,
   slippagePct: 0.02,
   exitOnOppositeCross: true,
+  longOnly: true, // conta brasileira da OKX: só mercado à vista
   maxDailyLossPct: 5,
   maxTradesPerDay: 5,
 };
@@ -160,6 +161,7 @@ export function entryRejection(s: SimState, r: SignalRecord, now: number): strin
   if (s.mode === 'ENCERRADO') return 'Simulação encerrada';
   if (!s.config.allowedInst.includes(r.instId)) return `${r.instId.replace('-', '/')} não está habilitado no simulador`;
   if (!s.config.allowedTf.includes(r.tf)) return `Tempo gráfico ${r.tf} não está habilitado no simulador`;
+  if (s.config.longOnly && r.side === 'SHORT') return 'Modo à vista (só LONG): sinal de venda serve apenas para sair de uma compra aberta';
   if (s.startedAt != null && r.closeTime < s.startedAt) return 'Sinal anterior ao início da simulação';
   if (now - r.closeTime > tfMs(r.tf)) return 'Sinal atrasado (candle fechou há mais de 1 período)';
   if (s.position) return `Já existe posição aberta (${s.position.side} ${s.position.instId.replace('-', '/')} ${s.position.timeframe}) — máximo 1`;
@@ -197,7 +199,7 @@ export function onSignal(s: SimState, r: SignalRecord, now: number): { state: Si
   }
   const position = openPosition({
     instId: r.instId, timeframe: r.tf, side: r.side, rawPrice: next.lastPrices[r.instId]!.price, time: now,
-    equity: next.balance, cfg: next.config, signalCandleTs: r.candleTs, signalId: r.id,
+    equity: next.balance, cfg: next.config.longOnly ? { ...next.config, leverage: 1 } : next.config, signalCandleTs: r.candleTs, signalId: r.id,
   });
   if (!position) {
     decisions.push({ status: 'rejeitada', reason: 'Tamanho de posição inválido', at: now });

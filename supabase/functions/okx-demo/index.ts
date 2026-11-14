@@ -1,24 +1,27 @@
-// Supabase Edge Function — EXECUTOR DEMO da OKX.
+// Supabase Edge Function — EXECUTOR DEMO da OKX (mercado À VISTA / spot).
 // • Opera SOMENTE na conta Demo (cabeçalho x-simulated-trading: 1 em toda chamada).
 //   Chaves da conta real não funcionam no ambiente Demo, então não há como movimentar dinheiro real.
 // • As chaves ficam nos Secrets do Supabase — nunca no site.
 // • Exige o cabeçalho x-bot-token = BOT_TOKEN (senha definida por você).
-// • Sem saques, sem transferências: só abrir/fechar posição em BTC-USDT-SWAP e ETH-USDT-SWAP.
+// • Só compra/venda à vista de BTC e ETH (em BRL ou USDT). Sem saques, transferências ou alavancagem.
 //
-// Secrets necessários: OKX_DEMO_API_KEY, OKX_DEMO_SECRET, OKX_DEMO_PASSPHRASE, BOT_TOKEN
-// Opcional: MAX_MARGIN_USDT (padrão 200)
+// Secrets: OKX_DEMO_API_KEY, OKX_DEMO_SECRET, OKX_DEMO_PASSPHRASE, BOT_TOKEN
+// Opcionais: MAX_ORDER_BRL (padrão 2000), MAX_ORDER_USDT (padrão 400)
 
-import { SWAP_OF, buildOrder, clOrdIdFrom, contractsFor, roundToTick, signOkx, validateOpenRequest, type OpenRequest } from './logic.ts';
+import {
+  BASES, buildSpotBuy, clOrdIdFrom, levelsFromPct, roundToTick, sellQty, signOkx, spotInstId, validateSpotOpen,
+  type SpotOpenRequest,
+} from './logic.ts';
 
-const BASE = Deno.env.get('OKX_BASE_URL') || 'https://www.okx.com'; // só para testes locais
+const BASE_URL = Deno.env.get('OKX_BASE_URL') || 'https://www.okx.com'; // override só para testes locais
 const env = (k: string) => Deno.env.get(k) ?? '';
+const MAX = { BRL: Number(env('MAX_ORDER_BRL') || 2000), USDT: Number(env('MAX_ORDER_USDT') || 400) };
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'content-type, x-bot-token, authorization, apikey, x-client-info',
 };
-
 const reply = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -27,13 +30,12 @@ class OkxErr extends Error {}
 async function okx<T = any>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T[]> {
   const ts = new Date().toISOString();
   const payload = body ? JSON.stringify(body) : '';
-  const sign = await signOkx(env('OKX_DEMO_SECRET'), ts, method, path, payload);
-  const res = await fetch(BASE + path, {
+  const res = await fetch(BASE_URL + path, {
     method,
     headers: {
       'Content-Type': 'application/json',
       'OK-ACCESS-KEY': env('OKX_DEMO_API_KEY'),
-      'OK-ACCESS-SIGN': sign,
+      'OK-ACCESS-SIGN': await signOkx(env('OKX_DEMO_SECRET'), ts, method, path, payload),
       'OK-ACCESS-TIMESTAMP': ts,
       'OK-ACCESS-PASSPHRASE': env('OKX_DEMO_PASSPHRASE'),
       'x-simulated-trading': '1', // SEMPRE DEMO
@@ -48,101 +50,88 @@ async function okx<T = any>(method: 'GET' | 'POST', path: string, body?: unknown
   return j.data as T[];
 }
 
-async function accountConfig() {
-  const [c] = await okx('GET', '/api/v5/account/config');
-  return { acctLv: String(c.acctLv), posMode: String(c.posMode) };
+async function instrument(instId: string) {
+  const [inst] = await okx('GET', `/api/v5/public/instruments?instType=SPOT&instId=${instId}`);
+  if (!inst) throw new OkxErr(`O par ${instId} não está disponível na sua conta Demo.`);
+  return inst as { lotSz: string; minSz: string; tickSz: string; baseCcy: string; quoteCcy: string };
 }
 
-async function positions(swapId?: string) {
-  const q = swapId ? `?instType=SWAP&instId=${swapId}` : '?instType=SWAP';
-  const ps = await okx('GET', '/api/v5/account/positions' + q);
-  return ps.filter((p: any) => Number(p.pos) !== 0);
+async function balances(ccys: string[]) {
+  const [b] = await okx('GET', `/api/v5/account/balance?ccy=${ccys.join(',')}`);
+  const out: Record<string, { eq: number; avail: number }> = {};
+  for (const d of b?.details ?? []) out[d.ccy] = { eq: Number(d.eq), avail: Number(d.availBal ?? d.availEq) };
+  return out;
 }
 
-async function status() {
-  const [cfg, bal, pos, hist] = await Promise.all([
-    accountConfig(),
-    okx('GET', '/api/v5/account/balance?ccy=USDT'),
-    positions(),
-    okx('GET', '/api/v5/trade/orders-history?instType=SWAP&limit=20'),
+async function status(quote: string) {
+  const [bal, hist, algos] = await Promise.all([
+    balances([quote, ...BASES]),
+    okx('GET', '/api/v5/trade/orders-history?instType=SPOT&limit=20'),
+    okx('GET', '/api/v5/trade/orders-algo-pending?instType=SPOT&ordType=conditional,oco'),
   ]);
-  const usdt = bal[0]?.details?.find((d: any) => d.ccy === 'USDT');
   return {
-    acctLv: cfg.acctLv,
-    posMode: cfg.posMode,
-    usdt: usdt ? { eq: Number(usdt.eq), avail: Number(usdt.availBal ?? usdt.availEq) } : null,
-    positions: pos.map((p: any) => ({
-      instId: p.instId, pos: p.pos, posSide: p.posSide, avgPx: Number(p.avgPx), markPx: Number(p.markPx),
-      upl: Number(p.upl), uplRatio: Number(p.uplRatio), lever: p.lever, liqPx: Number(p.liqPx) || null, margin: Number(p.margin || p.imr), cTime: Number(p.cTime),
-    })),
+    quote,
+    balances: bal,
     orders: hist.map((o: any) => ({
-      ordId: o.ordId, clOrdId: o.clOrdId, instId: o.instId, side: o.side, posSide: o.posSide, avgPx: Number(o.avgPx), sz: o.accFillSz,
-      state: o.state, fee: Number(o.fee), pnl: Number(o.pnl), cTime: Number(o.cTime), category: o.category,
+      ordId: o.ordId, clOrdId: o.clOrdId, instId: o.instId, side: o.side, avgPx: Number(o.avgPx), sz: o.accFillSz,
+      state: o.state, fee: Number(o.fee), feeCcy: o.feeCcy, cTime: Number(o.cTime), source: o.source,
     })),
+    protections: algos.map((a: any) => ({ algoId: a.algoId, instId: a.instId, sz: a.sz, slTriggerPx: Number(a.slTriggerPx) || null, tpTriggerPx: Number(a.tpTriggerPx) || null })),
   };
 }
 
-/** Prepara a conta Demo: modo "spot e futuros" e posições em modo único (net). */
-async function prepare() {
-  const cfg = await accountConfig();
-  const done: string[] = [];
-  if (cfg.acctLv === '1') {
-    await okx('POST', '/api/v5/account/set-account-level', { acctLv: '2' });
-    done.push('Conta Demo alterada para o modo “Spot e futuros”.');
-  }
-  if (cfg.posMode !== 'net_mode') {
-    await okx('POST', '/api/v5/account/set-position-mode', { posMode: 'net_mode' });
-    done.push('Modo de posição alterado para “compra/venda” (net).');
-  }
-  return { done: done.length ? done : ['Conta Demo já estava pronta.'] };
-}
-
-async function open(b: OpenRequest) {
-  const maxMargin = Number(env('MAX_MARGIN_USDT') || 200);
-  const errors = validateOpenRequest(b, maxMargin);
+async function open(b: SpotOpenRequest) {
+  const errors = validateSpotOpen(b, MAX);
   if (errors.length) throw new OkxErr(errors.join(' '));
-  const swapId = SWAP_OF[b.instId];
+  const instId = spotInstId(b.instId, b.quote)!;
+  const clOrdId = clOrdIdFrom(b.ref);
 
-  const cfg = await accountConfig();
-  if (cfg.acctLv === '1') throw new OkxErr('A conta Demo está no modo Spot. Use “Preparar conta Demo” nas Configurações do app.');
-  if ((await positions(swapId)).length) throw new OkxErr(`Já existe posição aberta em ${swapId} na conta Demo (máximo 1).`);
+  // Idempotência: se esta ordem já existe, não compra de novo.
+  const existing = await okx('GET', `/api/v5/trade/order?instId=${instId}&clOrdId=${clOrdId}`).catch(() => []);
+  if (existing.length) return { duplicate: true, ordId: existing[0].ordId, instId, message: 'Ordem deste sinal já existia na Demo; nada foi repetido.' };
 
-  const [[inst], [tk]] = await Promise.all([
-    okx('GET', `/api/v5/public/instruments?instType=SWAP&instId=${swapId}`),
-    okx('GET', `/api/v5/market/ticker?instId=${swapId}`),
+  const [inst, [tk], bal] = await Promise.all([
+    instrument(instId),
+    okx('GET', `/api/v5/market/ticker?instId=${instId}`),
+    balances([b.quote]),
   ]);
+  const avail = bal[b.quote]?.avail ?? 0;
+  if (avail < b.orderValue) throw new OkxErr(`Saldo insuficiente na Demo: ${avail.toFixed(2)} ${b.quote} disponível.`);
+
   const price = Number(tk.last);
-  const size = contractsFor({ marginUsdt: b.marginUsdt, leverage: b.leverage, price, ctVal: inst.ctVal, lotSz: inst.lotSz, minSz: inst.minSz });
-  if ('error' in size) throw new OkxErr(size.error);
-
-  // SL/TP coerentes com o preço atual (senão a OKX rejeita)
-  if (b.side === 'LONG' && !(b.stopPrice < price && b.takePrice > price)) throw new OkxErr('SL/TP inválidos para LONG no preço atual (o preço já passou de um deles).');
-  if (b.side === 'SHORT' && !(b.stopPrice > price && b.takePrice < price)) throw new OkxErr('SL/TP inválidos para SHORT no preço atual (o preço já passou de um deles).');
-
-  const lev: Record<string, unknown> = { instId: swapId, lever: String(b.leverage), mgnMode: 'isolated' };
-  if (cfg.posMode === 'long_short_mode') lev.posSide = b.side === 'LONG' ? 'long' : 'short';
-  await okx('POST', '/api/v5/account/set-leverage', lev);
-
-  const order = buildOrder({
-    swapId, side: b.side, sz: size.sz, stopPx: roundToTick(b.stopPrice, inst.tickSz), takePx: roundToTick(b.takePrice, inst.tickSz),
-    clOrdId: clOrdIdFrom(b.ref), posMode: cfg.posMode,
+  const lv = levelsFromPct(price, b.stopLossPct, b.takeProfitPct);
+  const order = buildSpotBuy({
+    instId, orderValue: b.orderValue, stopPx: roundToTick(lv.stop, inst.tickSz), takePx: roundToTick(lv.take, inst.tickSz), clOrdId,
   });
   const [r] = await okx('POST', '/api/v5/trade/order', order);
-  return { ordId: r.ordId, clOrdId: r.clOrdId, swapId, sz: size.sz, notional: size.notional, refPrice: price };
+  return { ordId: r.ordId, clOrdId, instId, orderValue: b.orderValue, refPrice: price, stop: order.attachAlgoOrds[0].slTriggerPx, take: order.attachAlgoOrds[0].tpTriggerPx };
 }
 
-async function close(instId: string) {
-  const swapId = SWAP_OF[instId];
-  if (!swapId) throw new OkxErr('Ativo não permitido.');
-  const cfg = await accountConfig();
-  const ps = await positions(swapId);
-  if (!ps.length) return { closed: false, message: 'Nenhuma posição aberta na Demo (pode já ter sido fechada pelo SL/TP da OKX).' };
-  for (const p of ps) {
-    const body: Record<string, unknown> = { instId: swapId, mgnMode: p.mgnMode || 'isolated', autoCxl: true };
-    if (cfg.posMode === 'long_short_mode') body.posSide = p.posSide;
-    await okx('POST', '/api/v5/trade/close-position', body);
-  }
-  return { closed: true, message: `Posição ${swapId} fechada a mercado na Demo.` };
+async function close(b: { instId: string; quote: string; ref: string }) {
+  const instId = spotInstId(String(b.instId), String(b.quote));
+  if (!instId || !b.ref) throw new OkxErr('Pedido de fechamento inválido.');
+  const clOrdId = clOrdIdFrom(b.ref);
+  const [buy] = await okx('GET', `/api/v5/trade/order?instId=${instId}&clOrdId=${clOrdId}`).catch(() => []);
+  if (!buy) return { closed: false, message: 'Não há compra deste sinal na Demo (talvez a entrada tenha falhado).' };
+  const [sold] = await okx('GET', `/api/v5/trade/order?instId=${instId}&clOrdId=${clOrdIdFrom(b.ref + '|sell')}`).catch(() => []);
+  if (sold) return { closed: false, message: 'Esta operação já foi vendida na Demo; nada foi repetido.' };
+
+  // 1) Cancela as proteções (SL/TP) ainda pendentes deste par, para liberar o saldo.
+  const algos = await okx('GET', `/api/v5/trade/orders-algo-pending?instType=SPOT&instId=${instId}&ordType=conditional,oco`);
+  if (algos.length) await okx('POST', '/api/v5/trade/cancel-algos', algos.map((a: any) => ({ algoId: a.algoId, instId })));
+
+  // 2) Vende o que esta compra rendeu (limitado ao saldo disponível).
+  const inst = await instrument(instId);
+  const bal = await balances([inst.baseCcy]);
+  const qty = sellQty({
+    accFillSz: buy.accFillSz, fee: buy.fee, feeCcy: buy.feeCcy, base: inst.baseCcy,
+    availBal: bal[inst.baseCcy]?.avail ?? 0, lotSz: inst.lotSz, minSz: inst.minSz,
+  });
+  if (!qty) return { closed: false, message: `Nada a vender em ${instId}: a OKX provavelmente já executou o Stop Loss ou o Take Profit.` };
+  const [r] = await okx('POST', '/api/v5/trade/order', {
+    instId, tdMode: 'cash', side: 'sell', ordType: 'market', sz: qty, clOrdId: clOrdIdFrom(b.ref + '|sell'),
+  });
+  return { closed: true, ordId: r.ordId, message: `Vendidos ${qty} ${inst.baseCcy} a mercado na Demo.` };
 }
 
 Deno.serve(async (req) => {
@@ -164,10 +153,9 @@ Deno.serve(async (req) => {
 
   try {
     switch (body.action) {
-      case 'status': return reply({ ok: true, data: await status() });
-      case 'prepare': return reply({ ok: true, data: await prepare() });
-      case 'open': return reply({ ok: true, data: await open(body as OpenRequest) });
-      case 'close': return reply({ ok: true, data: await close(String(body.instId)) });
+      case 'status': return reply({ ok: true, data: await status(String(body.quote || 'BRL')) });
+      case 'open': return reply({ ok: true, data: await open(body as SpotOpenRequest) });
+      case 'close': return reply({ ok: true, data: await close(body) });
       default: return reply({ ok: false, error: 'Ação desconhecida.' }, 400);
     }
   } catch (e) {

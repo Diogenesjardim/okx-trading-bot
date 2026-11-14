@@ -26,7 +26,7 @@ function mkSignal(over: Partial<SignalRecord> = {}): SignalRecord {
   };
 }
 
-const cfg = { ...Sim.DEFAULT_SIM_CONFIG, feePct: 0, slippagePct: 0, stopLossPct: 2, takeProfitPct: 4, positionSizePct: 100, allowedTf: ['15m', '1H'] as Timeframe[] };
+const cfg = { ...Sim.DEFAULT_SIM_CONFIG, longOnly: false, feePct: 0, slippagePct: 0, stopLossPct: 2, takeProfitPct: 4, positionSizePct: 100, allowedTf: ['15m', '1H'] as Timeframe[] };
 
 /** Simulador ativo, iniciado antes do sinal, com preço atual conhecido. */
 function activeSim(price = 3000, instId: InstId = 'ETH-USDT') {
@@ -227,5 +227,29 @@ describe('filtro de tendência no Analista e Simulador', () => {
     const out = Sim.onSignal(activeSim(), { ...mkSignal(), blockedByTrend: true }, T0 + M15 + 2000);
     expect(out.decisions[0].reason).toContain('tendência');
     expect(out.state.position).toBeNull();
+  });
+});
+
+describe('Simulador em modo só LONG', () => {
+  const lo = { ...cfg, longOnly: true, leverage: 3 as const };
+  const act = () => {
+    let s = Sim.initialSimState(lo, T0);
+    s = Sim.start(s, T0);
+    return Sim.onPrice(s, 'ETH-USDT', 3000, T0 + M15 + 1000);
+  };
+  it('rejeita SHORT para entrada, abre LONG em 1X', () => {
+    const r = Sim.onSignal(act(), mkSignal({ id: 'sh', side: 'SHORT' }), T0 + M15 + 2000);
+    expect(r.state.position).toBeNull();
+    expect(r.decisions[0].reason).toContain('só LONG');
+    const l = Sim.onSignal(act(), mkSignal(), T0 + M15 + 2000);
+    expect(l.state.position?.leverage).toBe(1);
+  });
+  it('sinal de venda encerra a compra aberta (e não abre SHORT)', () => {
+    let s = Sim.onSignal(act(), mkSignal(), T0 + M15 + 2000).state;
+    s = Sim.onPrice(s, 'ETH-USDT', 3010, T0 + 2 * M15 + 500);
+    const out = Sim.onSignal(s, mkSignal({ id: 'x', side: 'SHORT', candleTs: T0 + M15, closeTime: T0 + 2 * M15 }), T0 + 2 * M15 + 1000);
+    expect(out.decisions.map((d) => d.status)).toEqual(['saida', 'rejeitada']);
+    expect(out.state.position).toBeNull();
+    expect(out.state.trades[0].exitReason).toBe('Cruzamento oposto');
   });
 });

@@ -10,11 +10,13 @@ export interface DemoConfig {
   enabled: boolean; // espelhar as posições do Robô Simulador na conta Demo da OKX
   url: string;
   token: string;
+  quote: 'BRL' | 'USDT'; // moeda da conta Demo (OKX Brasil: BRL)
+  orderValue: number; // valor de cada compra na Demo, na moeda `quote`
 }
 
 export interface DemoLog {
   ts: number;
-  action: 'abrir' | 'fechar' | 'status' | 'preparar';
+  action: 'abrir' | 'fechar' | 'status';
   ok: boolean;
   msg: string;
 }
@@ -25,14 +27,13 @@ export interface DemoState {
   handled: string[]; // "open:<posId>" / "close:<posId>" já enviados (evita ordem duplicada)
 }
 
-export const DEFAULT_DEMO: DemoState = { config: { enabled: false, url: '', token: '' }, log: [], handled: [] };
+export const DEFAULT_DEMO: DemoState = { config: { enabled: false, url: '', token: '', quote: 'BRL', orderValue: 500 }, log: [], handled: [] };
 
 export interface DemoStatus {
-  acctLv: string;
-  posMode: string;
-  usdt: { eq: number; avail: number } | null;
-  positions: { instId: string; pos: string; posSide: string; avgPx: number; markPx: number; upl: number; uplRatio: number; lever: string; liqPx: number | null; margin: number; cTime: number }[];
-  orders: { ordId: string; clOrdId: string; instId: string; side: string; posSide: string; avgPx: number; sz: string; state: string; fee: number; pnl: number; cTime: number; category: string }[];
+  quote: string;
+  balances: Record<string, { eq: number; avail: number }>;
+  orders: { ordId: string; clOrdId: string; instId: string; side: string; avgPx: number; sz: string; state: string; fee: number; feeCcy: string; cTime: number; source: string }[];
+  protections: { algoId: string; instId: string; sz: string; slTriggerPx: number | null; tpTriggerPx: number | null }[];
 }
 
 export const demoReady = (c: DemoConfig) => /^https:\/\/.+/.test(c.url.trim()) && c.token.trim().length >= 8;
@@ -71,7 +72,12 @@ export function demoActions(prev: Position | null, next: Position | null): DemoA
   return out;
 }
 
-export const openPayload = (p: Position) => ({
-  instId: p.instId, side: p.side, marginUsdt: +p.margin.toFixed(2), leverage: p.leverage,
-  stopPrice: p.stopPrice, takePrice: p.takePrice, ref: p.signalId ?? p.id,
+/** Compra à vista na Demo: SL/TP vão em % e são recalculados pelo preço do par negociado (ex.: ETH-BRL). */
+export const openPayload = (p: Position, c: DemoConfig) => ({
+  instId: p.instId, quote: c.quote, orderValue: c.orderValue,
+  stopLossPct: +(((p.entryPrice - p.stopPrice) / p.entryPrice) * 100).toFixed(3),
+  takeProfitPct: +(((p.takePrice - p.entryPrice) / p.entryPrice) * 100).toFixed(3),
+  ref: p.signalId ?? p.id,
 });
+
+export const closePayload = (p: Position, c: DemoConfig) => ({ instId: p.instId, quote: c.quote, ref: p.signalId ?? p.id });

@@ -15,7 +15,7 @@ import { Matrix } from './Matrix';
 const DEFAULT: BacktestConfig & { candles: number } = {
   instId: 'ETH-USDT', timeframe: '1H', initialCapital: 100, candles: 1000,
   leverage: 1, stopLossPct: 2, takeProfitPct: 4, positionSizePct: 100, feePct: 0.05, slippagePct: 0.03,
-  rsiFilter: true, exitOnOppositeCross: true,
+  rsiFilter: true, exitOnOppositeCross: true, longOnly: true,
 };
 
 const SIZES = [300, 500, 1000, 2000, 3000];
