@@ -8,6 +8,7 @@ import {
 } from '../lib/analystEngine';
 import * as Sim from '../lib/simEngine';
 import { beep, showNotification } from '../lib/alerts';
+import { DEFAULT_DEMO, demoActions, demoCall, openPayload, type DemoConfig, type DemoLog, type DemoState, type DemoStatus } from '../lib/okxDemo';
 
 /**
  * ORQUESTRADOR — integra os dois robôs a cada ciclo:
@@ -52,6 +53,13 @@ interface Ctx {
   polling: boolean;
   actionError: string | null;
   pollNow: () => Promise<void>;
+  demo: DemoState;
+  demoStatus: DemoStatus | null;
+  demoBusy: boolean;
+  setDemoConfig: (c: DemoConfig) => void;
+  refreshDemo: () => Promise<void>;
+  prepareDemo: () => Promise<void>;
+  closeDemo: (instId: InstId) => Promise<void>;
   setAnalystEnabled: (v: boolean) => void;
   setAnalystConfig: (c: AnalystConfig) => void;
   clearSignals: () => void;
@@ -77,13 +85,51 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   const [, setClock] = useState(0);
   const busy = useRef(false);
 
+  // ---------- Executor DEMO (conta de teste da OKX) ----------
+  const demoRef = useRef<DemoState>({ ...DEFAULT_DEMO, ...load<Partial<DemoState>>(KEYS.demo, {}) });
+  const [demo, setDemoState] = useState<DemoState>(demoRef.current);
+  const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null);
+  const [demoBusy, setDemoBusy] = useState(false);
+  const updateDemo = useCallback((fn: (d: DemoState) => DemoState) => {
+    demoRef.current = fn(demoRef.current);
+    save(KEYS.demo, demoRef.current);
+    setDemoState(demoRef.current);
+  }, []);
+  const demoLog = useCallback((e: Omit<DemoLog, 'ts'>) => updateDemo((d) => ({ ...d, log: [{ ...e, ts: Date.now() }, ...d.log].slice(0, 60) })), [updateDemo]);
+
+  /** Espelha na conta Demo cada abertura/fechamento do Robô Simulador (uma única vez por posição). */
+  const mirrorToDemo = useCallback(async (prev: Sim.SimState['position'], next: Sim.SimState['position']) => {
+    const cfg = demoRef.current.config;
+    if (!cfg.enabled) return;
+    for (const a of demoActions(prev, next)) {
+      const key = `${a.type}:${a.pos.id}`;
+      if (demoRef.current.handled.includes(key)) continue;
+      updateDemo((d) => ({ ...d, handled: [key, ...d.handled].slice(0, 400) }));
+      const label = `${a.pos.side} ${instLabel(a.pos.instId)}`;
+      try {
+        if (a.type === 'close') {
+          const r = await demoCall<{ message: string }>(cfg, 'close', { instId: a.pos.instId });
+          demoLog({ action: 'fechar', ok: true, msg: `${label}: ${r.message}` });
+        } else {
+          const r = await demoCall<{ ordId: string; sz: string; swapId: string; refPrice: number }>(cfg, 'open', openPayload(a.pos));
+          demoLog({ action: 'abrir', ok: true, msg: `${label}: ordem ${r.ordId} enviada (${r.sz} contratos ${r.swapId}, ~${r.refPrice}) com SL/TP na OKX.` });
+        }
+      } catch (e) {
+        demoLog({ action: a.type === 'open' ? 'abrir' : 'fechar', ok: false, msg: `${label}: ${e instanceof Error ? e.message : 'falha'}` });
+      }
+    }
+  }, [demoLog, updateDemo]);
+
   /** Toda mudança de estado passa por aqui: síncrona, persistida e sem corrida. */
   const commit = useCallback((fn: (s: Store) => Store) => {
+    const prevPos = store.current.sim.position;
     store.current = fn(store.current);
+    const nextPos = store.current.sim.position;
+    if (prevPos?.id !== nextPos?.id) void mirrorToDemo(prevPos, nextPos);
     save(KEYS.analyst, store.current.analyst);
     save(KEYS.sim2, store.current.sim);
     rerender();
-  }, []);
+  }, [mirrorToDemo]);
 
   const poll = useCallback(async () => {
     if (busy.current) return;
@@ -241,6 +287,45 @@ export function BotsProvider({ children }: { children: ReactNode }) {
     visible,
     polling,
     actionError,
+    demo,
+    demoStatus,
+    demoBusy,
+    setDemoConfig: (c) => updateDemo((d) => ({ ...d, config: c })),
+    refreshDemo: async () => {
+      setDemoBusy(true);
+      try {
+        setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status'));
+      } catch (e) {
+        setDemoStatus(null);
+        demoLog({ action: 'status', ok: false, msg: e instanceof Error ? e.message : 'falha' });
+      } finally {
+        setDemoBusy(false);
+      }
+    },
+    prepareDemo: async () => {
+      setDemoBusy(true);
+      try {
+        const r = await demoCall<{ done: string[] }>(demoRef.current.config, 'prepare');
+        demoLog({ action: 'preparar', ok: true, msg: r.done.join(' ') });
+        setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status'));
+      } catch (e) {
+        demoLog({ action: 'preparar', ok: false, msg: e instanceof Error ? e.message : 'falha' });
+      } finally {
+        setDemoBusy(false);
+      }
+    },
+    closeDemo: async (instId) => {
+      setDemoBusy(true);
+      try {
+        const r = await demoCall<{ message: string }>(demoRef.current.config, 'close', { instId });
+        demoLog({ action: 'fechar', ok: true, msg: r.message });
+        setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status'));
+      } catch (e) {
+        demoLog({ action: 'fechar', ok: false, msg: e instanceof Error ? e.message : 'falha' });
+      } finally {
+        setDemoBusy(false);
+      }
+    },
     pollNow: poll,
     setAnalystEnabled: (v) =>
       commit((s) => ({

@@ -7,6 +7,7 @@ import { dailyUsage, limitReason, simPhase, unrealized } from '../lib/simEngine'
 import { fmtDateTime, fmtPrice, fmtSignedUSD, fmtTime, fmtUSD, pnlColor } from '../lib/format';
 import { Card, ChipMulti, ConfirmButton, ErrorBox, Notice, NumberField, Segmented, SideBadge } from '../components/ui';
 import { Journal } from './Journal';
+import { DemoAccountCard } from '../components/DemoPanel';
 import { StrategyFields, validateStrategy } from '../components/StrategyFields';
 import { CsvButtons, ReportCharts, StatsGrid } from '../components/Report';
 import { TradesTable } from '../components/TradesTable';
@@ -129,6 +130,8 @@ function SimulatedView() {
           <p className="text-sm text-zinc-500">Nenhuma posição aberta. Máximo de uma por vez.</p>
         )}
       </Card>
+
+      <DemoAccountCard />
 
       <Card title="Resultados (fictícios)">
         <StatsGrid stats={stats} label="Saldo fictício" />

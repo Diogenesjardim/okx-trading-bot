@@ -25,5 +25,6 @@ export const KEYS = {
   validationCfg: 'okxbot.validationCfg.v1',
   validationRuns: 'okxbot.validationRuns.v1',
   matrix: 'okxbot.matrix.v1',
-  journal: 'okxbot.journal.real.v1', // DINHEIRO REAL — separado dos dados fictícios
+  journal: 'okxbot.journal.real.v1',
+  demo: 'okxbot.demo.v1', // URL da função + token (as chaves da OKX ficam no Supabase) // DINHEIRO REAL — separado dos dados fictícios
 };

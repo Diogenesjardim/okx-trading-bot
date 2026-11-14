@@ -1,0 +1,41 @@
+name: Publicar funções no Supabase
+
+# Publica as Edge Functions (okx-demo e okx-proxy) no seu projeto Supabase.
+# Requer no GitHub (Settings → Secrets and variables → Actions):
+#   Secret:   SUPABASE_ACCESS_TOKEN  (supabase.com → Account → Access Tokens)
+#   Variable: SUPABASE_PROJECT_REF   (o código do projeto, ex.: abcdxyzkqlmn)
+# As chaves da OKX NÃO ficam no GitHub: são cadastradas direto nos Secrets do Supabase.
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/**', '.github/workflows/supabase.yml']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar configuração
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then
+            echo "::warning::Configure SUPABASE_ACCESS_TOKEN (secret) e SUPABASE_PROJECT_REF (variable) para publicar as funções."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+      - uses: supabase/setup-cli@v1
+        if: env.SKIP != '1'
+        with:
+          version: latest
+      - name: Testar lógica do executor
+        if: env.SKIP != '1'
+        run: npm ci && npx vitest run src/lib/okxDemoLogic.test.ts
+      - name: Publicar okx-demo
+        if: env.SKIP != '1'
+        run: supabase functions deploy okx-demo --project-ref "$PROJECT_REF" --no-verify-jwt
+      - name: Publicar okx-proxy
+        if: env.SKIP != '1'
+        run: supabase functions deploy okx-proxy --project-ref "$PROJECT_REF" --no-verify-jwt

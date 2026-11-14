@@ -43,6 +43,25 @@ Disponíveis no Backtest, Validação e Matriz (comparar execuções salvas) e n
 - **Matriz:** os 8 mercados de uma vez (atenção: muitos testes aumentam a chance de um parecer bom por sorte).
 - Limitação: o histórico público da OKX tem profundidade limitada; 3.000 candles de 15 min ≈ 1 mês.
 
+## Ordens automáticas na conta DEMO da OKX — `supabase/functions/okx-demo`
+O Robô Simulador pode **espelhar cada posição** como ordem real na **conta Demo** da OKX (dinheiro fictício da OKX), com Stop Loss e Take Profit anexados à ordem — executados pela própria OKX, mesmo com o celular bloqueado.
+
+**Segurança**
+- Toda chamada usa o cabeçalho `x-simulated-trading: 1` (ambiente Demo). Chaves da conta real não funcionam nele.
+- Chaves da OKX ficam só nos **Secrets do Supabase**. O site guarda apenas a URL da função e um token (BOT_TOKEN).
+- Travas: só BTC/ETH-USDT-SWAP, alavancagem ≤ 3X, margem ≤ 200 USDT (`MAX_MARGIN_USDT`), 1 posição por ativo, SL/TP obrigatórios e coerentes com o preço.
+- Sem saques, transferências ou outros endpoints.
+
+**Configuração (dá para fazer pelo iPhone)**
+1. **Supabase:** crie um projeto gratuito. Anote o *Project ref* (código na URL do projeto).
+2. **Supabase → Account → Access Tokens:** gere um token.
+3. **GitHub → Settings → Secrets and variables → Actions:** Secret `SUPABASE_ACCESS_TOKEN` e Variable `SUPABASE_PROJECT_REF`. Rode o workflow *Publicar funções no Supabase*.
+4. **OKX → Negociação demo → API:** crie uma chave **Demo** com permissão *Ler* + *Negociar* (sem saque). Guarde key, secret e passphrase.
+5. **Supabase → Edge Functions → Secrets:** `OKX_DEMO_API_KEY`, `OKX_DEMO_SECRET`, `OKX_DEMO_PASSPHRASE`, `BOT_TOKEN` (uma senha sua, mín. 8 caracteres).
+6. **App → Config. → Ordens automáticas (conta Demo):** URL `https://<ref>.supabase.co/functions/v1/okx-demo` + o mesmo token → *Testar conexão* → *Preparar conta Demo* (se aparecer) → ligar *Espelhar*.
+
+**Limitações:** as entradas dependem do app aberto (o robô ainda roda no navegador); SL/TP depois de enviados ficam na OKX. Posições abertas antes de ligar o espelhamento não são enviadas.
+
 ## Funcionamento real (importante)
 Os robôs rodam no navegador: **só funcionam com o site aberto e em primeiro plano**. Com o iPhone bloqueado ou o Safari em segundo plano, o iOS suspende o código. Ao voltar, o intervalo interrompido é registrado e nenhum sinal retroativo é criado.
 Para 24h: worker na nuvem (Node/Cloudflare Cron) rodando `analystEngine` + `simEngine`, banco (Supabase), API com login e Web Push/Telegram. Os motores já são funções puras, prontas para reaproveitar.

@@ -1,0 +1,8 @@
+# Configuração mínima para o deploy das Edge Functions pelo GitHub Actions.
+project_id = "okx-trading-bot"
+
+[functions.okx-demo]
+verify_jwt = false   # protegido pelo cabeçalho x-bot-token (BOT_TOKEN)
+
+[functions.okx-proxy]
+verify_jwt = false   # só dados públicos de mercado

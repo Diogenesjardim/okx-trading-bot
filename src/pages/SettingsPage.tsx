@@ -4,6 +4,7 @@ import { INSTRUMENTS, TIMEFRAMES } from '../types';
 import { useBots } from '../hooks/BotsContext';
 import { downloadText } from '../lib/csv';
 import { KEYS } from '../lib/storage';
+import { DemoSettingsCard } from '../components/DemoPanel';
 import { Card, ChipMulti, ConfirmButton, Segmented, Toggle } from '../components/ui';
 
 const WORKING = [
@@ -19,6 +20,7 @@ const WORKING = [
   'Matriz BTC/ETH × 5m/15m/1h/4h com os mesmos parâmetros e histórico das últimas 5 execuções para comparar.',
   'Filtro de tendência (SMA50/100/200) no Analista, Backtest, Validação e Matriz.',
   'Diário de operações reais (registro manual, separado do fictício) com comparação real × simulador e CSV.',
+  'Ordens automáticas na conta DEMO da OKX espelhando o simulador, com SL/TP na própria OKX (chaves guardadas no Supabase).',
   'Métricas: resultado bruto e líquido, maior sequência de perdas, média por operação.',
   'Configurações e históricos salvos no LocalStorage.',
 ];
@@ -29,7 +31,8 @@ const PENDING = [
   'Sincronização entre dispositivos (dados ficam apenas neste navegador).',
   'Gráfico de velas (candlestick); hoje o preço é exibido em linha.',
   'Estratégias além do cruzamento SMA9/SMA21 + filtro RSI.',
-  'Envio automático de ordens (próximo passo: conta Demo da OKX via Supabase; dinheiro real só depois).',
+  'Ordens automáticas com dinheiro REAL (hoje só na conta Demo da OKX, por segurança).',
+  'Robô rodando na nuvem: as entradas na Demo ainda dependem do app aberto (o SL/TP já fica na OKX).',
 ];
 
 export function SettingsPage() {
@@ -83,6 +86,8 @@ export function SettingsPage() {
           <p className="text-[11px] text-zinc-500">Alertas sonoros e notificações ficam na aba Analista. Risco, alavancagem e limites ficam na aba Simulador.</p>
         </div>
       </Card>
+
+      <DemoSettingsCard />
 
       <Card title="Armazenamento local" icon={<Database className="h-4 w-4 text-sky-400" />}>
         <p className="text-xs leading-relaxed text-zinc-400">
