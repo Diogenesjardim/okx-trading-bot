@@ -69,3 +69,12 @@ describe('espelhamento simulador → Demo', () => {
     expect(closePayload(pos('a'), DEFAULT_DEMO.config)).toEqual({ instId: 'ETH-USDT', quote: 'BRL', ref: 'sa' });
   });
 });
+
+describe('functionUrl', () => {
+  it('força a região de São Paulo só em URLs do Supabase', async () => {
+    const { functionUrl } = await import('./okxDemo');
+    expect(functionUrl(' https://abc.supabase.co/functions/v1/okx-demo ')).toBe('https://abc.supabase.co/functions/v1/okx-demo?forceFunctionRegion=sa-east-1');
+    expect(functionUrl('https://abc.supabase.co/functions/v1/okx-demo?forceFunctionRegion=us-east-1')).toContain('us-east-1');
+    expect(functionUrl('https://exemplo.com/x')).toBe('https://exemplo.com/x');
+  });
+});

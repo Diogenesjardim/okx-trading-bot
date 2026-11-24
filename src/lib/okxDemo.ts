@@ -38,12 +38,24 @@ export interface DemoStatus {
 
 export const demoReady = (c: DemoConfig) => /^https:\/\/.+/.test(c.url.trim()) && c.token.trim().length >= 8;
 
+/** Roda a função no Supabase de São Paulo (sa-east-1): a OKX recusa chamadas vindas de IPs dos EUA. */
+export function functionUrl(raw: string): string {
+  const url = raw.trim();
+  try {
+    const u = new URL(url);
+    if (u.hostname.endsWith('.supabase.co') && !u.searchParams.has('forceFunctionRegion')) u.searchParams.set('forceFunctionRegion', 'sa-east-1');
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export async function demoCall<T>(cfg: DemoConfig, action: string, payload: Record<string, unknown> = {}): Promise<T> {
   if (!demoReady(cfg)) throw new Error('Configure a URL da função e o token (mín. 8 caracteres) em Config.');
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 20_000);
   try {
-    const res = await fetch(cfg.url.trim(), {
+    const res = await fetch(functionUrl(cfg.url), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-bot-token': cfg.token.trim() },
       body: JSON.stringify({ action, ...payload }),

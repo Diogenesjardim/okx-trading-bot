@@ -14,7 +14,7 @@ import {
 } from './logic.ts';
 
 const BASE_URL = Deno.env.get('OKX_BASE_URL') || 'https://www.okx.com'; // override só para testes locais
-const env = (k: string) => Deno.env.get(k) ?? '';
+const env = (k: string) => (Deno.env.get(k) ?? '').trim();
 const MAX = { BRL: Number(env('MAX_ORDER_BRL') || 2000), USDT: Number(env('MAX_ORDER_USDT') || 400) };
 
 const cors = {
@@ -28,6 +28,19 @@ const reply = (body: unknown, status = 200) =>
 class OkxErr extends Error {}
 
 async function okx<T = any>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T[]> {
+  // 50001/50013 = OKX ocupada: tenta de novo uma vez (só para leituras; ordens têm clOrdId e são reconsultadas).
+  try {
+    return await okxOnce<T>(method, path, body);
+  } catch (e) {
+    if (method === 'GET' && e instanceof OkxErr && /^OKX (50001|50013)/.test(e.message)) {
+      await new Promise((r) => setTimeout(r, 1200));
+      return await okxOnce<T>(method, path, body);
+    }
+    throw e;
+  }
+}
+
+async function okxOnce<T = any>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T[]> {
   const ts = new Date().toISOString();
   const payload = body ? JSON.stringify(body) : '';
   const res = await fetch(BASE_URL + path, {
@@ -45,7 +58,7 @@ async function okx<T = any>(method: 'GET' | 'POST', path: string, body?: unknown
   const j = await res.json().catch(() => ({}));
   if (j.code !== '0') {
     const detail = Array.isArray(j.data) && j.data[0]?.sMsg ? ` — ${j.data[0].sMsg}` : '';
-    throw new OkxErr(`OKX ${j.code ?? res.status}: ${j.msg || 'erro'}${detail}`);
+    throw new OkxErr(`OKX ${j.code ?? res.status}: ${j.msg || 'erro'}${detail} [${path.split('?')[0]}]`);
   }
   return j.data as T[];
 }
