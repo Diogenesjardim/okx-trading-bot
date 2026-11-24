@@ -112,7 +112,7 @@ export function SettingsPage() {
 
       <Card title="Funcionamento e monitoramento 24h" icon={<Cloud className="h-4 w-4 text-sky-400" />}>
         <p className="text-xs leading-relaxed text-zinc-400">
-          Os robôs rodam <b className="text-zinc-200">dentro do navegador</b>. Funcionam só com o site aberto e na tela. Com o iPhone bloqueado, o app em segundo plano ou o Safari fechado, o iOS suspende o código e o monitoramento <b className="text-zinc-200">para</b>. Ao voltar, o sistema registra o intervalo interrompido e não cria sinais retroativos.
+          Os robôs rodam <b className="text-zinc-200">dentro do navegador</b>. No computador funcionam com a aba aberta, mesmo minimizada (desde que o PC não durma). Com o iPhone bloqueado, o app em segundo plano ou o Safari fechado, o iOS suspende o código e o monitoramento <b className="text-zinc-200">para</b>. Ao voltar, o sistema registra o intervalo interrompido e não cria sinais retroativos.
         </p>
         <p className="mt-3 text-xs font-semibold text-zinc-200">Arquitetura proposta para monitoramento contínuo:</p>
         <ol className="mt-1 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-zinc-400">

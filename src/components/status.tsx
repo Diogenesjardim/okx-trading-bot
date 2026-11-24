@@ -11,7 +11,7 @@ export const ANALYST_STATUS: Record<AnalystStatus, { label: string; cls: string;
   iniciando: { label: 'Conectando…', cls: 'bg-sky-500/15 text-sky-300', dot: 'bg-sky-300 animate-pulse', desc: 'Primeira consulta em andamento.' },
   pausado: { label: 'Analista pausado', cls: 'bg-zinc-800 text-zinc-400', dot: 'bg-zinc-500', desc: 'Nenhuma consulta sendo feita.' },
   erro: { label: 'Erro de conexão', cls: 'bg-rose-500/15 text-rose-400', dot: 'bg-rose-400', desc: 'A API da OKX não respondeu. Nova tentativa no próximo ciclo.' },
-  interrompido: { label: 'Monitoramento interrompido', cls: 'bg-amber-500/15 text-amber-300', dot: 'bg-amber-300', desc: 'Site em segundo plano ou sem atualização recente. Volte ao site para retomar.' },
+  interrompido: { label: 'Monitoramento interrompido', cls: 'bg-amber-500/15 text-amber-300', dot: 'bg-amber-300', desc: 'Sem consulta recente (site fechado, PC dormindo, iPhone bloqueado ou sem conexão). Volte ao site para retomar.' },
 };
 
 export function AnalystChip({ status }: { status: AnalystStatus }) {

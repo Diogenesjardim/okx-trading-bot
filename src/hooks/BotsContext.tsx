@@ -5,6 +5,7 @@ import { KEYS, load, save } from '../lib/storage';
 import {
   addAnalystLog, analyzeStream, analystStatus, initialAnalystState, isBlocked,
   type AnalystConfig, type AnalystState, type AnalystStatus, type SignalRecord,
+  gapLimitMs,
 } from '../lib/analystEngine';
 import * as Sim from '../lib/simEngine';
 import { beep, showNotification } from '../lib/alerts';
@@ -186,7 +187,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
           a = { ...a, lastError: msg };
         } else {
           if (a.lastError) a = addAnalystLog(a, { type: 'ok', msg: 'Conexão com a OKX restabelecida.' }, now);
-          if (prevOk && a.enabled && now - prevOk > a.config.intervalSec * 3000) {
+          if (prevOk && a.enabled && now - prevOk > gapLimitMs(a.config.intervalSec)) {
             a = addAnalystLog(a, {
               type: 'alerta',
               msg: `Monitoramento interrompido entre ${new Date(prevOk).toLocaleTimeString('pt-BR')} e ${new Date(now).toLocaleTimeString('pt-BR')} (site fechado, em segundo plano ou sem conexão). Candles desse intervalo não geram sinais retroativos.`,
@@ -254,7 +255,8 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!active) return;
     void poll();
-    const t = setInterval(() => document.visibilityState === 'visible' && void poll(), interval * 1000);
+    // Continua consultando com a aba em segundo plano (PC/Chrome minimizado). No iPhone o iOS congela a página de qualquer jeito.
+    const t = setInterval(() => void poll(), interval * 1000);
     return () => clearInterval(t);
   }, [active, interval, poll]);
 

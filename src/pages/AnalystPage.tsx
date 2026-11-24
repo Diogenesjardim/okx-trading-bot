@@ -62,9 +62,9 @@ export function AnalystPage() {
           </button>
         )}
         {analyst.enabled && analyst.lastError && <div className="mt-3"><ErrorBox message={analyst.lastError} onRetry={pollNow} /></div>}
-        {!visible && analyst.enabled && <div className="mt-3"><Notice tone="warn">Site em segundo plano: o navegador suspende as consultas.</Notice></div>}
+        {!visible && analyst.enabled && <div className="mt-3"><Notice tone="warn">Site em segundo plano: no computador as consultas continuam (até 1 por minuto); no iPhone o iOS pausa.</Notice></div>}
         <div className="mt-3">
-          <Notice>Só analisa. Nunca abre posições — isso é papel do Robô Simulador. Funciona enquanto o site estiver aberto e em primeiro plano.</Notice>
+          <Notice>Só analisa. Nunca abre posições — isso é papel do Robô Simulador. Funciona enquanto o site estiver aberto: no computador, minimizado também; no iPhone, só com a tela ligada.</Notice>
         </div>
       </Card>
 

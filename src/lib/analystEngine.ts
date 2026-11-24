@@ -199,14 +199,16 @@ export function analyzeStream(args: {
   return { snapshot, lastProcessedTs: last.ts, record };
 }
 
+/** Tempo sem consulta bem-sucedida que conta como interrupção. Com a aba em segundo plano, o Chrome pode espaçar os timers para 1 por minuto. */
+export const gapLimitMs = (intervalSec: number) => Math.max(intervalSec * 3, 150) * 1000;
+
 export type AnalystStatus = 'ativo' | 'pausado' | 'erro' | 'interrompido' | 'iniciando';
 
-export function analystStatus(a: AnalystState, now: number, visible: boolean): AnalystStatus {
+export function analystStatus(a: AnalystState, now: number, _visible?: boolean): AnalystStatus {
   if (!a.enabled) return 'pausado';
-  if (!visible) return 'interrompido';
   if (a.lastError) return 'erro';
   if (!a.lastSuccessAt) return 'iniciando';
-  if (now - a.lastSuccessAt > a.config.intervalSec * 3 * 1000) return 'interrompido';
+  if (now - a.lastSuccessAt > gapLimitMs(a.config.intervalSec)) return 'interrompido';
   return 'ativo';
 }
 
