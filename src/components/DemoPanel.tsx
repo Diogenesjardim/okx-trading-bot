@@ -13,7 +13,12 @@ export function DemoSettingsCard() {
   const [url, setUrl] = useState(demo.config.url);
   const [token, setToken] = useState(demo.config.token);
   const [show, setShow] = useState(false);
-  const dirty = url !== demo.config.url || token !== demo.config.token;
+  const dirty = url.trim() !== demo.config.url || token.trim() !== demo.config.token;
+  const save = () => {
+    const u = url.trim(), t = token.trim();
+    setUrl(u); setToken(t);
+    setDemoConfig({ ...demo.config, url: u, token: t });
+  };
   const max = demo.config.quote === 'BRL' ? 2000 : 400;
 
   return (
@@ -37,8 +42,8 @@ export function DemoSettingsCard() {
           </div>
         </label>
         <div className="flex gap-2">
-          <button disabled={!dirty} onClick={() => setDemoConfig({ ...demo.config, url: url.trim(), token: token.trim() })} className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white disabled:opacity-40">Salvar</button>
-          <button disabled={!demoReady(demo.config) || demoBusy || dirty} onClick={refreshDemo} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-zinc-800 py-2 text-sm disabled:opacity-40">
+          <button disabled={!dirty} onClick={save} className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white disabled:opacity-40">Salvar</button>
+          <button disabled={demoBusy || !demoReady({ ...demo.config, url, token })} onClick={() => { if (dirty) save(); refreshDemo(); }} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-zinc-800 py-2 text-sm disabled:opacity-40">
             {demoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />} Testar conexão
           </button>
         </div>
