@@ -47,6 +47,11 @@ export function DemoSettingsCard() {
             {demoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />} Testar conexão
           </button>
         </div>
+        {!demoStatus && !demoBusy && demo.log[0]?.action === 'status' && !demo.log[0].ok && (
+          <div className="rounded-xl bg-red-500/10 p-3 text-xs text-red-300 ring-1 ring-red-500/30">
+            ✗ Falha no teste ({fmtDateTime(demo.log[0].ts)}): {demo.log[0].msg}
+          </div>
+        )}
         {demoStatus && (
           <div className="rounded-xl bg-zinc-950/60 p-3 text-xs ring-1 ring-zinc-800">
             <div className="text-emerald-400">✓ Conectado ao Trading simulado</div>
