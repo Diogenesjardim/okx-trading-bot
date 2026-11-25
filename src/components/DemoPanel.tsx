@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FlaskRound, Loader2, PlugZap, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useBots } from '../hooks/BotsContext';
-import { demoReady } from '../lib/okxDemo';
+import { TEST_ORDER, demoReady } from '../lib/okxDemo';
 import { fmtDateTime, fmtNum, fmtPrice } from '../lib/format';
 import { Card, Empty, Notice, NumberField, Segmented, Toggle } from './ui';
 
@@ -81,8 +81,9 @@ export function DemoSettingsCard() {
 
 /** Situação da conta Demo (aba Simulador). */
 export function DemoAccountCard() {
-  const { demo, demoStatus, demoBusy, refreshDemo } = useBots();
+  const { demo, demoStatus, demoBusy, refreshDemo, demoTestBuy, demoTestSell, sim } = useBots();
   if (!demoReady(demo.config)) return null;
+  const testValue = demo.config.quote === 'BRL' ? `R$ ${TEST_ORDER.valueBRL}` : `${TEST_ORDER.valueUSDT} USDT`;
   return (
     <Card
       title="Trading simulado OKX"
@@ -96,6 +97,23 @@ export function DemoAccountCard() {
       <div className="flex items-center justify-between text-xs">
         <Badge />
         <span className={demo.config.enabled ? 'text-emerald-400' : 'text-zinc-500'}>{demo.config.enabled ? `Espelhando · ${demo.config.orderValue} ${demo.config.quote}/compra` : 'Espelhamento desligado (Config.)'}</span>
+      </div>
+      <div className="mt-3 rounded-xl bg-zinc-950/60 p-3 ring-1 ring-zinc-800">
+        <div className="text-xs font-semibold text-zinc-200">Ordem de teste</div>
+        <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+          Compra {testValue} de ETH no Trading simulado com o Stop Loss e o Take Profit do simulador ({sim.config.stopLossPct}% / {sim.config.takeProfitPct}%). Confira na OKX e depois venda. Serve só para testar a execução; não entra no resultado do robô.
+        </p>
+        {demo.testRef ? (
+          <button onClick={demoTestSell} disabled={demoBusy || sim.position?.instId === TEST_ORDER.instId} className="mt-2 w-full rounded-xl bg-rose-600 py-2 text-sm font-semibold text-white disabled:opacity-40">
+            {demoBusy ? 'Enviando…' : 'Vender teste'}
+          </button>
+        ) : (
+          <button onClick={demoTestBuy} disabled={demoBusy || !!sim.position} className="mt-2 w-full rounded-xl bg-sky-600 py-2 text-sm font-semibold text-white disabled:opacity-40">
+            {demoBusy ? 'Enviando…' : `Comprar teste (${testValue} em ETH)`}
+          </button>
+        )}
+        {demo.testRef && sim.position?.instId === TEST_ORDER.instId && <p className="mt-1 text-[11px] text-amber-300">O robô abriu uma posição em ETH: venda o teste depois que ela fechar.</p>}
+        {sim.position && !demo.testRef && <p className="mt-1 text-[11px] text-amber-300">Indisponível com posição do robô aberta (a venda de teste cancelaria as proteções dela).</p>}
       </div>
       {demoStatus ? (
         <>

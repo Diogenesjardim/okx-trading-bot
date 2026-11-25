@@ -9,7 +9,7 @@ import {
 } from '../lib/analystEngine';
 import * as Sim from '../lib/simEngine';
 import { beep, showNotification } from '../lib/alerts';
-import { DEFAULT_DEMO, closePayload, demoActions, demoCall, openPayload, type DemoConfig, type DemoLog, type DemoState, type DemoStatus } from '../lib/okxDemo';
+import { DEFAULT_DEMO, TEST_ORDER, closePayload, demoActions, demoCall, openPayload, testOpenPayload, type DemoConfig, type DemoLog, type DemoState, type DemoStatus } from '../lib/okxDemo';
 
 /**
  * ORQUESTRADOR — integra os dois robôs a cada ciclo:
@@ -59,6 +59,8 @@ interface Ctx {
   demoBusy: boolean;
   setDemoConfig: (c: DemoConfig) => void;
   refreshDemo: () => Promise<void>;
+  demoTestBuy: () => Promise<void>;
+  demoTestSell: () => Promise<void>;
   setAnalystEnabled: (v: boolean) => void;
   setAnalystConfig: (c: AnalystConfig) => void;
   clearSignals: () => void;
@@ -308,6 +310,39 @@ export function BotsProvider({ children }: { children: ReactNode }) {
       } finally {
         setDemoBusy(false);
       }
+    },
+    demoTestBuy: async () => {
+      const d = demoRef.current;
+      if (d.testRef || store.current.sim.position) return;
+      const ref = `teste-${Date.now()}`;
+      updateDemo((x) => ({ ...x, testRef: ref }));
+      setDemoBusy(true);
+      try {
+        const { stopLossPct, takeProfitPct } = store.current.sim.config;
+        const r = await demoCall<{ ordId: string; instId: string; refPrice: number; stop: string; take: string; orderValue: number }>(d.config, 'open', testOpenPayload(d.config, ref, stopLossPct, takeProfitPct));
+        demoLog({ action: 'abrir', ok: true, msg: `TESTE: compra de ${r.orderValue} ${d.config.quote} em ${r.instId} (~${r.refPrice}) · SL ${r.stop} · TP ${r.take} na OKX (ordem ${r.ordId}). Confira na OKX e depois toque em "Vender teste".` });
+      } catch (e) {
+        updateDemo((x) => ({ ...x, testRef: null }));
+        demoLog({ action: 'abrir', ok: false, msg: `TESTE: ${e instanceof Error ? e.message : 'falha'}` });
+      } finally {
+        setDemoBusy(false);
+      }
+      try { setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status', { quote: demoRef.current.config.quote })); } catch { /* status é só visual */ }
+    },
+    demoTestSell: async () => {
+      const d = demoRef.current;
+      if (!d.testRef) return;
+      setDemoBusy(true);
+      try {
+        const r = await demoCall<{ closed: boolean; message: string }>(d.config, 'close', { instId: TEST_ORDER.instId, quote: d.config.quote, ref: d.testRef });
+        updateDemo((x) => ({ ...x, testRef: null }));
+        demoLog({ action: 'fechar', ok: true, msg: `TESTE: ${r.message}` });
+      } catch (e) {
+        demoLog({ action: 'fechar', ok: false, msg: `TESTE: ${e instanceof Error ? e.message : 'falha'}` });
+      } finally {
+        setDemoBusy(false);
+      }
+      try { setDemoStatus(await demoCall<DemoStatus>(demoRef.current.config, 'status', { quote: demoRef.current.config.quote })); } catch { /* status é só visual */ }
     },
     pollNow: poll,
     setAnalystEnabled: (v) =>

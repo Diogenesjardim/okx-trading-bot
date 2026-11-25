@@ -25,6 +25,7 @@ export interface DemoState {
   config: DemoConfig;
   log: DemoLog[];
   handled: string[]; // "open:<posId>" / "close:<posId>" já enviados (evita ordem duplicada)
+  testRef?: string | null; // ordem de teste comprada e ainda não vendida
 }
 
 export const DEFAULT_DEMO: DemoState = { config: { enabled: false, url: '', token: '', quote: 'BRL', orderValue: 500 }, log: [], handled: [] };
@@ -93,3 +94,9 @@ export const openPayload = (p: Position, c: DemoConfig) => ({
 });
 
 export const closePayload = (p: Position, c: DemoConfig) => ({ instId: p.instId, quote: c.quote, ref: p.signalId ?? p.id });
+
+/** Ordem de teste manual: valor pequeno, sempre ETH, mesmos SL/TP do simulador. */
+export const TEST_ORDER = { instId: 'ETH-USDT' as const, valueBRL: 50, valueUSDT: 10 };
+export const testOpenPayload = (c: DemoConfig, ref: string, stopLossPct: number, takeProfitPct: number) => ({
+  instId: TEST_ORDER.instId, quote: c.quote, orderValue: c.quote === 'BRL' ? TEST_ORDER.valueBRL : TEST_ORDER.valueUSDT, stopLossPct, takeProfitPct, ref,
+});
