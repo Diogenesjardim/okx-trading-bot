@@ -23,16 +23,17 @@ const WORKING = [
   'Ordens automáticas na conta DEMO da OKX espelhando o simulador, com SL/TP na própria OKX (chaves guardadas no Supabase).',
   'Métricas: resultado bruto e líquido, maior sequência de perdas, média por operação.',
   'Configurações e históricos salvos no LocalStorage.',
+  'Robô na nuvem (Fase 4): Analista + Simulador rodando no GitHub Actions a cada ~5 min, com o site fechado, espelhando na Demo da OKX; painel na tela Início (o mesmo em qualquer aparelho).',
 ];
 
 const PENDING = [
-  'Monitoramento 24h com o iPhone bloqueado ou o site fechado (exige backend — ver arquitetura abaixo).',
   'Notificações push vindas de servidor (hoje só disparam com o site aberto).',
-  'Sincronização entre dispositivos (dados ficam apenas neste navegador).',
+  'Sincronização dos robôs locais entre dispositivos (o robô na nuvem já é o mesmo em todos).',
   'Gráfico de velas (candlestick); hoje o preço é exibido em linha.',
   'Estratégias além do cruzamento SMA9/SMA21 + filtro RSI.',
   'Ordens automáticas com dinheiro REAL (hoje só na conta Demo da OKX, por segurança).',
-  'Robô rodando na nuvem: as entradas na Demo ainda dependem do app aberto (o SL/TP já fica na OKX).',
+  'Alterar a configuração da nuvem pelo site (hoje fica no arquivo bot/config.json do GitHub).',
+  'Execução na nuvem a cada minuto (o agendamento gratuito do GitHub roda a cada ~5 min e pode atrasar).',
 ];
 
 export function SettingsPage() {

@@ -11,6 +11,7 @@ import { TradesTable } from '../components/TradesTable';
 import { SignalHistory } from '../components/SignalHistory';
 import { ANALYST_STATUS, AnalystChip, DecisionTag, SIM_PHASE, SignalPill, SimChip } from '../components/status';
 import type { Route } from '../components/Layout';
+import { CloudPanel } from '../components/CloudPanel';
 
 export function Home({ go }: { go: (r: Route) => void }) {
   const { analyst, sim, tickers, status, pollNow } = useBots();
@@ -24,6 +25,7 @@ export function Home({ go }: { go: (r: Route) => void }) {
 
   return (
     <>
+      <CloudPanel />
       <div className="grid grid-cols-2 gap-2">
         <button onClick={() => go('analista')} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 text-left">
           <div className="flex items-center gap-1.5 text-xs text-zinc-400"><Radar className="h-3.5 w-3.5" /> Robô Analista</div>

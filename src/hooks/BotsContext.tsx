@@ -9,6 +9,8 @@ import {
 } from '../lib/analystEngine';
 import * as Sim from '../lib/simEngine';
 import { beep, showNotification } from '../lib/alerts';
+import { cloudMirroring, fetchCloudState } from '../lib/cloud';
+import type { CloudState } from '../lib/cloudCycle';
 import { DEFAULT_DEMO, TEST_ORDER, closePayload, demoActions, demoCall, openPayload, testOpenPayload, type DemoConfig, type DemoLog, type DemoState, type DemoStatus } from '../lib/okxDemo';
 
 /**
@@ -59,6 +61,9 @@ interface Ctx {
   demoBusy: boolean;
   setDemoConfig: (c: DemoConfig) => void;
   refreshDemo: () => Promise<void>;
+  cloud: CloudState | null;
+  cloudError: string | null;
+  refreshCloud: () => Promise<void>;
   demoTestBuy: () => Promise<void>;
   demoTestSell: () => Promise<void>;
   setAnalystEnabled: (v: boolean) => void;
@@ -93,6 +98,24 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   })());
   const [demo, setDemoState] = useState<DemoState>(demoRef.current);
   const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null);
+  const cloudRef = useRef<CloudState | null>(null);
+  const [cloud, setCloud] = useState<CloudState | null>(null);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+  const refreshCloud = useCallback(async () => {
+    try {
+      const c = await fetchCloudState();
+      cloudRef.current = c;
+      setCloud(c);
+      setCloudError(null);
+    } catch (e) {
+      setCloudError(e instanceof Error ? e.message : 'falha');
+    }
+  }, []);
+  useEffect(() => {
+    void refreshCloud();
+    const t = setInterval(() => void refreshCloud(), 60_000);
+    return () => clearInterval(t);
+  }, [refreshCloud]);
   const [demoBusy, setDemoBusy] = useState(false);
   const updateDemo = useCallback((fn: (d: DemoState) => DemoState) => {
     demoRef.current = fn(demoRef.current);
@@ -105,6 +128,15 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   const mirrorToDemo = useCallback(async (prev: Sim.SimState['position'], next: Sim.SimState['position']) => {
     const cfg = demoRef.current.config;
     if (!cfg.enabled) return;
+    if (cloudMirroring(cloudRef.current, Date.now())) {
+      const p = next ?? prev;
+      const key = `cloud-skip:${p?.id}`;
+      if (p && !demoRef.current.handled.includes(key)) {
+        updateDemo((d) => ({ ...d, handled: [key, ...d.handled].slice(0, 400) }));
+        demoLog({ action: next ? 'abrir' : 'fechar', ok: false, msg: 'Robô na nuvem ativo: o site não envia ordens para não duplicar. A nuvem cuida da Demo.' });
+      }
+      return;
+    }
     for (const a of demoActions(prev, next)) {
       const key = `${a.type}:${a.pos.id}`;
       if (demoRef.current.handled.includes(key)) continue;
@@ -311,6 +343,9 @@ export function BotsProvider({ children }: { children: ReactNode }) {
         setDemoBusy(false);
       }
     },
+    cloud,
+    cloudError,
+    refreshCloud,
     demoTestBuy: async () => {
       const d = demoRef.current;
       if (d.testRef || store.current.sim.position) return;

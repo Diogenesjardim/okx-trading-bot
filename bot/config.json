@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+  "analyst": {
+    "instruments": ["BTC-USDT", "ETH-USDT"],
+    "timeframes": ["1H", "4H"],
+    "rsiFilter": true,
+    "trendFilter": true,
+    "trendPeriod": 200
+  },
+  "sim": {
+    "initialCapital": 100,
+    "allowedInst": ["BTC-USDT", "ETH-USDT"],
+    "allowedTf": ["1H", "4H"],
+    "leverage": 1,
+    "stopLossPct": 1.5,
+    "takeProfitPct": 3,
+    "positionSizePct": 50,
+    "feePct": 0.05,
+    "slippagePct": 0.02,
+    "exitOnOppositeCross": true,
+    "longOnly": true,
+    "maxDailyLossPct": 5,
+    "maxTradesPerDay": 5
+  },
+  "demo": { "enabled": true, "quote": "USDT", "orderValue": 100 }
+}
