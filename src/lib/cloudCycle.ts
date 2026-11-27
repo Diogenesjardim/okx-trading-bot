@@ -5,7 +5,7 @@ import { closePayload, demoActions, openPayload, type DemoLog } from './okxDemo'
 
 /**
  * ROBÔ NA NUVEM (Fase 4) — um ciclo completo, sem navegador.
- * Roda a cada ~5 min no GitHub Actions (bot/run.ts) com os MESMOS motores do site
+ * Roda a cada minuto na função bot-cycle do Supabase (agendador pg_cron) com os MESMOS motores do site
  * (analystEngine + simEngine) e espelha entradas/saídas na conta Demo da OKX.
  * Função pura em relação ao estado: recebe o estado anterior e devolve o novo.
  */
@@ -43,7 +43,7 @@ export interface CloudDeps {
 const MIN5 = 5 * 60_000;
 
 function analystConfig(c: CloudConfig): AnalystConfig {
-  return { ...c.analyst, intervalSec: 300 as AnalystConfig['intervalSec'], sound: false, notifications: false }; // nuvem: ~5 min
+  return { ...c.analyst, intervalSec: 60, sound: false, notifications: false }; // nuvem: 1x por minuto
 }
 const simConfig = (c: CloudConfig): SimConfig => ({ ...Sim.DEFAULT_SIM_CONFIG, ...c.sim });
 
@@ -136,8 +136,8 @@ export async function runCycle(prev: CloudState | null, cfg: CloudConfig, deps: 
   const total = insts.size + aCfg.instruments.length * aCfg.timeframes.length;
   const ok = failures < total;
   if (ok) {
-    if (st.lastOkAt && now - st.lastOkAt > 45 * 60_000) {
-      a = addAnalystLog(a, { type: 'alerta', msg: `Robô na nuvem ficou sem rodar entre ${new Date(st.lastOkAt).toISOString()} e ${new Date(now).toISOString()} (atraso do GitHub). Candles desse intervalo não geram sinais retroativos.` }, now);
+    if (st.lastOkAt && now - st.lastOkAt > 10 * 60_000) {
+      a = addAnalystLog(a, { type: 'alerta', msg: `Robô na nuvem ficou sem rodar entre ${new Date(st.lastOkAt).toISOString()} e ${new Date(now).toISOString()}. Candles desse intervalo não geram sinais retroativos.` }, now);
     }
     a = { ...a, lastSuccessAt: now, lastError: null };
     st = { ...st, lastOkAt: now };

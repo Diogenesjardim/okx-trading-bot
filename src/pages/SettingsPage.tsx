@@ -23,7 +23,7 @@ const WORKING = [
   'Ordens automáticas na conta DEMO da OKX espelhando o simulador, com SL/TP na própria OKX (chaves guardadas no Supabase).',
   'Métricas: resultado bruto e líquido, maior sequência de perdas, média por operação.',
   'Configurações e históricos salvos no LocalStorage.',
-  'Robô na nuvem (Fase 4): Analista + Simulador rodando no GitHub Actions a cada ~5 min, com o site fechado, espelhando na Demo da OKX; painel na tela Início (o mesmo em qualquer aparelho).',
+  'Robô na nuvem (Fase 4): Analista + Simulador rodando no Supabase a cada minuto, com o site fechado, espelhando na Demo da OKX; painel na tela Início (o mesmo em qualquer aparelho).',
 ];
 
 const PENDING = [
@@ -33,7 +33,6 @@ const PENDING = [
   'Estratégias além do cruzamento SMA9/SMA21 + filtro RSI.',
   'Ordens automáticas com dinheiro REAL (hoje só na conta Demo da OKX, por segurança).',
   'Alterar a configuração da nuvem pelo site (hoje fica no arquivo bot/config.json do GitHub).',
-  'Execução na nuvem a cada minuto (o agendamento gratuito do GitHub roda a cada ~5 min e pode atrasar).',
 ];
 
 export function SettingsPage() {

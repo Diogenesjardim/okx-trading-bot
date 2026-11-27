@@ -7,7 +7,8 @@
     "dev": "vite --host",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:engine": "esbuild bot/engine-entry.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=supabase/functions/bot-cycle/engine.js --banner:js='// GERADO por npm run build:engine — não editar. Fonte: src/lib/cloudCycle.ts + bot/config.json'"
   },
   "dependencies": {
     "lucide-react": "^1.72.0",
@@ -21,6 +22,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

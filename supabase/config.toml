@@ -6,3 +6,6 @@ verify_jwt = false   # protegido pelo cabeçalho x-bot-token (BOT_TOKEN)
 
 [functions.okx-proxy]
 verify_jwt = false   # só dados públicos de mercado
+
+[functions.bot-cycle]
+verify_jwt = false   # GET = estado público (sem segredos); POST (rodar ciclo) exige x-bot-token

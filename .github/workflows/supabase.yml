@@ -1,6 +1,6 @@
 name: Publicar funções no Supabase
 
-# Publica as Edge Functions (okx-demo e okx-proxy) no seu projeto Supabase.
+# Publica as Edge Functions (okx-demo, okx-proxy e bot-cycle = robô na nuvem) no seu projeto Supabase.
 # Requer no GitHub (Settings → Secrets and variables → Actions):
 #   Secret:   SUPABASE_ACCESS_TOKEN  (supabase.com → Account → Access Tokens)
 #   Variable: SUPABASE_PROJECT_REF   (o código do projeto, ex.: abcdxyzkqlmn)
@@ -9,7 +9,7 @@ name: Publicar funções no Supabase
 on:
   push:
     branches: [main]
-    paths: ['supabase/functions/**', '.github/workflows/supabase.yml']
+    paths: ['supabase/functions/**', 'src/lib/**', 'src/types.ts', 'bot/**', '.github/workflows/supabase.yml']
   workflow_dispatch:
 
 jobs:
@@ -30,12 +30,23 @@ jobs:
         if: env.SKIP != '1'
         with:
           version: latest
-      - name: Testar lógica do executor
+      - name: Testar executor e robô na nuvem; gerar o motor da nuvem
         if: env.SKIP != '1'
-        run: npm ci && npx vitest run src/lib/okxDemoLogic.test.ts
+        run: |
+          npm ci
+          npx vitest run src/lib/okxDemoLogic.test.ts src/lib/cloudCycle.test.ts
+          npm run build:engine
       - name: Publicar okx-demo
         if: env.SKIP != '1'
         run: supabase functions deploy okx-demo --project-ref "$PROJECT_REF" --no-verify-jwt --yes
       - name: Publicar okx-proxy
         if: env.SKIP != '1'
         run: supabase functions deploy okx-proxy --project-ref "$PROJECT_REF" --no-verify-jwt --yes
+      - name: Publicar bot-cycle (robô na nuvem)
+        if: env.SKIP != '1'
+        run: supabase functions deploy bot-cycle --project-ref "$PROJECT_REF" --no-verify-jwt --yes
+      - name: Conferir robô na nuvem (GET, só leitura)
+        if: env.SKIP != '1'
+        run: |
+          sleep 5
+          curl -s -m 30 "https://$PROJECT_REF.supabase.co/functions/v1/bot-cycle?forceFunctionRegion=sa-east-1" | head -c 400; echo

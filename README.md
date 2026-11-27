@@ -146,10 +146,10 @@ src/
 
 ## Robô na nuvem (Fase 4)
 
-- `.github/workflows/bot.yml` roda **a cada ~5 min** no GitHub Actions (grátis em repositório público) o mesmo Analista + Simulador do site (`src/lib/cloudCycle.ts`, executado por `bot/run.ts`).
-- Configuração em `bot/config.json` (ativos, tempos gráficos, filtros, SL/TP, valor da ordem na Demo). `enabled: false` para de abrir posições.
-- Dados de mercado e ordens passam pelas funções do Supabase rodando em São Paulo (`forceFunctionRegion=sa-east-1`), porque a OKX recusa IPs dos EUA.
-- Estado salvo no branch `bot-state` (`state.json`, 1 commit só); o site lê e mostra no painel **Robô na nuvem** da tela Início.
-- Requer o secret **BOT_TOKEN** no GitHub (o mesmo do Supabase). Sem ele, a nuvem analisa e simula, mas não envia ordens à Demo.
+- Função **bot-cycle** do Supabase, chamada **a cada minuto** pelo agendador do banco (pg_cron + pg_net). Roda o mesmo Analista + Simulador do site (`src/lib/cloudCycle.ts`, empacotado em `supabase/functions/bot-cycle/engine.js` por `npm run build:engine`).
+- Configuração em `bot/config.json` (ativos, tempos gráficos, filtros, SL/TP, valor da ordem na Demo). `enabled: false` para de abrir posições. Depois de alterar, o push publica a função de novo.
+- Roda em São Paulo (`forceFunctionRegion=sa-east-1`), porque a OKX recusa IPs dos EUA. Espelha na Demo pela função okx-demo.
+- Estado na tabela `bot_state` (RLS sem políticas: só a função acessa). `GET bot-cycle` devolve o estado (sem segredos) para o painel **Robô na nuvem** da tela Início.
+- Instalação única: rodar `supabase/install-robo-nuvem.sql` no SQL Editor com o seu BOT_TOKEN. Parar: `select cron.unschedule('robo-nuvem');`
 - Com a nuvem ativa, o site para de espelhar ordens sozinho (evita ordem dupla); o executor também é idempotente pelo id do sinal.
-- Limites: o GitHub pode atrasar execuções (5–20 min) e desativa agendamentos após 60 dias sem atividade no repositório.
+- O agendador chamando o banco todo minuto também evita que o projeto gratuito seja pausado por inatividade.

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Cloud, ExternalLink, RefreshCw } from 'lucide-react';
 import { useBots } from '../hooks/BotsContext';
-import { CLOUD_RUNS_URL, cloudHealth, type CloudHealth } from '../lib/cloud';
+import { CLOUD_LOGS_URL, cloudHealth, type CloudHealth } from '../lib/cloud';
 import { computeStats } from '../lib/metrics';
 import { instLabel } from '../types';
 import { fmtDateTime, fmtPrice, fmtSignedUSD, fmtUSD, pnlColor } from '../lib/format';
@@ -10,10 +10,10 @@ import { SignalHistory } from './SignalHistory';
 import { TradesTable } from './TradesTable';
 
 const HEALTH: Record<CloudHealth, { label: string; cls: string; desc: string }> = {
-  ativo: { label: 'Nuvem ativa', cls: 'bg-emerald-500/15 text-emerald-300', desc: 'Rodando no GitHub a cada ~5 min, sem depender do seu PC ou iPhone.' },
-  atrasado: { label: 'Nuvem atrasada', cls: 'bg-amber-500/15 text-amber-300', desc: 'O GitHub está atrasando as execuções (comum em horários de pico). Deve voltar sozinho.' },
-  parado: { label: 'Nuvem parada', cls: 'bg-red-500/15 text-red-300', desc: 'Sem execução há mais de 1h30. Veja as execuções no GitHub.' },
-  'sem-dados': { label: 'Nuvem sem dados', cls: 'bg-zinc-800 text-zinc-400', desc: 'O robô na nuvem ainda não rodou.' },
+  ativo: { label: 'Nuvem ativa', cls: 'bg-emerald-500/15 text-emerald-300', desc: 'Rodando no Supabase a cada minuto, sem depender do seu PC ou iPhone.' },
+  atrasado: { label: 'Nuvem atrasada', cls: 'bg-amber-500/15 text-amber-300', desc: 'Última execução há mais de 5 min. Se continuar, veja os registros no Supabase.' },
+  parado: { label: 'Nuvem parada', cls: 'bg-red-500/15 text-red-300', desc: 'Sem execução há mais de 20 min. O projeto do Supabase pode ter pausado ou o agendador parou.' },
+  'sem-dados': { label: 'Nuvem sem dados', cls: 'bg-zinc-800 text-zinc-400', desc: 'O robô na nuvem ainda não rodou (falta rodar o SQL de instalação no Supabase).' },
 };
 
 const ago = (ts: number, now: number) => {
@@ -118,8 +118,8 @@ export function CloudPanel() {
           )}
         </>
       )}
-      <a href={CLOUD_RUNS_URL} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-[11px] text-sky-400">
-        Ver execuções no GitHub <ExternalLink className="h-3 w-3" />
+      <a href={CLOUD_LOGS_URL} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-[11px] text-sky-400">
+        Ver registros no Supabase <ExternalLink className="h-3 w-3" />
       </a>
     </Card>
   );
