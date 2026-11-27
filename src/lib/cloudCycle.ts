@@ -42,6 +42,11 @@ export interface CloudDeps {
 
 const MIN5 = 5 * 60_000;
 
+/** Comparação independente da ordem das chaves (o jsonb do Postgres reordena as chaves ao gravar). */
+const stable = (v: unknown): string =>
+  Array.isArray(v) ? `[${v.map(stable).join(',')}]` : v && typeof v === 'object' ? `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`).join(',')}}` : JSON.stringify(v);
+export const sameConfig = (a: unknown, b: unknown) => stable(a) === stable(b);
+
 function analystConfig(c: CloudConfig): AnalystConfig {
   return { ...c.analyst, intervalSec: 60, sound: false, notifications: false }; // nuvem: 1x por minuto
 }
@@ -85,11 +90,11 @@ export async function runCycle(prev: CloudState | null, cfg: CloudConfig, deps: 
 
   // Configuração (bot/config.json) → motores
   const aCfg = analystConfig(cfg);
-  if (JSON.stringify(aCfg) !== JSON.stringify(st.analyst.config)) {
+  if (!sameConfig(aCfg, st.analyst.config)) {
     st = { ...st, analyst: addAnalystLog({ ...st.analyst, config: aCfg }, { type: 'info', msg: 'Configurações do analista atualizadas (nuvem).' }, now) };
   }
   const sCfg = simConfig(cfg);
-  if (JSON.stringify(sCfg) !== JSON.stringify(st.sim.config)) st = { ...st, sim: Sim.updateConfig(st.sim, sCfg, now) };
+  if (!sameConfig(sCfg, st.sim.config)) st = { ...st, sim: Sim.updateConfig(st.sim, sCfg, now) };
   if (cfg.enabled && st.sim.mode !== 'ATIVO') st = { ...st, sim: Sim.start(st.sim, now) };
   if (!cfg.enabled && st.sim.mode === 'ATIVO') st = { ...st, sim: Sim.pause(st.sim, now) };
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Candle, InstId, Timeframe } from '../types';
 import { analyzeStream } from './analystEngine';
-import { runCycle, type CloudConfig } from './cloudCycle';
+import { runCycle, sameConfig, type CloudConfig } from './cloudCycle';
 
 const H = 3_600_000;
 const cfg: CloudConfig = {
@@ -86,5 +86,20 @@ describe('runCycle (robô na nuvem)', () => {
     now = view[view.length - 1].ts + H + 5 * 60_000;
     const r2 = await runCycle(r1.state, { ...cfg, enabled: false }, deps);
     expect(r2.state.sim.position).toBeNull();
+  });
+});
+
+describe('sameConfig', () => {
+  it('ignora a ordem das chaves (jsonb do banco reordena)', async () => {
+    expect(sameConfig({ b: 1, a: [1, { y: 2, x: 1 }] }, { a: [1, { x: 1, y: 2 }], b: 1 })).toBe(true);
+    expect(sameConfig({ a: 1 }, { a: 2 })).toBe(false);
+  });
+  it('não registra "configurações atualizadas" a cada execução quando o estado volta do banco reordenado', async () => {
+    const deps = { now: () => 1_800_000_000_000, ticker: async () => 100, candles: async () => [] };
+    const r1 = await runCycle(null, cfg, deps);
+    const reordered = JSON.parse(JSON.stringify(r1.state, (_k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).reverse()) : v)));
+    const r2 = await runCycle(reordered, cfg, { ...deps, now: () => 1_800_000_060_000 });
+    expect(r2.state.sim.log.filter((l) => /Configurações do simulador/.test(l.msg))).toHaveLength(0);
+    expect(r2.state.analyst.log.filter((l) => /Configurações do analista/.test(l.msg))).toHaveLength(0);
   });
 });
