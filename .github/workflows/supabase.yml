@@ -49,4 +49,5 @@ jobs:
         if: env.SKIP != '1'
         run: |
           sleep 5
-          curl -s -m 30 "https://$PROJECT_REF.supabase.co/functions/v1/bot-cycle?forceFunctionRegion=sa-east-1" | head -c 400; echo
+          curl -s -m 30 "https://$PROJECT_REF.supabase.co/functions/v1/bot-cycle?forceFunctionRegion=sa-east-1" > estado.json || true
+          jq -r 'if .ok then (.data // {}) | "execuções: \(.runs) · última OK: \((.lastOkAt // 0) / 1000 | todate) · simulador: \(.sim.mode) · posição: \(.sim.position.instId // "nenhuma") · erro: \(.analyst.lastError // "-") · logs de config: \([.sim.log[]? | select(.msg | test("Configurações do simulador"))] | length) · último log demo: \(.demo.log[0].msg // "-")" else "ERRO: \(.error)" end' estado.json || head -c 400 estado.json
